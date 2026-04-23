@@ -1,0 +1,2396 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Video-Overlay-App</title>
+  <style>
+    :root {
+      --bg: #e5e7eb;
+      --panel: #f3f4f6;
+      --border: #cbd5e1;
+      --text: #0f172a;
+      --muted: #475569;
+      --accent: #0f172a;
+      --accent-2: #1d4ed8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+    .app {
+      display: grid;
+      grid-template-columns: minmax(320px, 400px) 1fr;
+      min-height: 100vh;
+      gap: 18px;
+      padding: 12px;
+    }
+    .sidebar {
+      padding: 18px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: auto;
+      box-shadow: 0 3px 10px rgba(15, 23, 42, 0.04);
+    }
+    .stage {
+      display: grid;
+      grid-template-rows: auto auto auto;
+      align-content: start;
+      min-width: 0;
+      min-height: 0;
+      overflow: auto;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: 0 3px 10px rgba(15, 23, 42, 0.04);
+    }
+    h1 { font-size: 1.05rem; margin: 0 0 14px 0; }
+    .dropzone {
+      padding: 20px 14px;
+      border: 2px dashed #cbd5e1;
+      border-radius: 18px;
+      text-align: center;
+      color: var(--muted);
+      background: #f8fafc;
+      transition: 0.15s ease;
+      margin-bottom: 16px;
+    }
+    .dropzone.active {
+      border-color: var(--accent-2);
+      background: #eff6ff;
+      color: #1e3a8a;
+    }
+    .dropzone button { margin-top: 10px; }
+    .toolbar-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .tab-btn, .ghost-btn, .primary-btn {
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      background: #fff;
+      color: var(--text);
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .tab-btn.active, .primary-btn {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .accordion { display: grid; gap: 10px; }
+    .acc-item {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .acc-head {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px;
+      background: #fff;
+      border: 0;
+      cursor: pointer;
+      font-size: 0.98rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .acc-head span:last-child {
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .acc-body { display: none; padding: 0 14px 14px 14px; }
+    .acc-item.open .acc-body { display: block; }
+    .grid2, .grid3 { display: grid; gap: 10px; margin-bottom: 10px; }
+    .grid2 { grid-template-columns: 1fr 1fr; }
+    .grid3 { grid-template-columns: repeat(3, 1fr); }
+    label {
+      display: block;
+      font-size: 0.83rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    input[type="number"], input[type="text"], select, button, input[type="color"] {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      padding: 9px 10px;
+      font-size: 0.92rem;
+    }
+    input[type="color"] { padding: 4px; height: 42px; }
+    input[type="range"] { width: 100%; }
+    .timeline-wrap {
+      position: relative;
+      margin-top: 2px;
+    }
+    .timeline-overlay {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: 8px;
+      transform: translateY(-50%);
+      pointer-events: none;
+      border-radius: 999px;
+    }
+    .timeline-range {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      background: rgba(29, 78, 216, 0.22);
+      border-radius: 999px;
+    }
+    .timeline-marker {
+      position: absolute;
+      top: -4px;
+      width: 3px;
+      height: 16px;
+      background: #1d4ed8;
+      border-radius: 2px;
+    }
+    .toolbar {
+      padding: 14px 18px 10px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 12px;
+    }
+    .fit-header-equation {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.95);
+      border-radius: 12px;
+      color: #0f172a;
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+      max-width: min(100%, 860px);
+    }
+    .fit-header-type {
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .fit-header-formula {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .canvas-wrap {
+      position: relative;
+      display: grid;
+      place-items: start center;
+      padding: 6px 18px 8px 18px;
+    }
+    canvas {
+      max-width: calc(100vw - 470px);
+      max-height: calc(100vh - 220px);
+      background: #dbe4ef;
+      border-radius: 16px;
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+      touch-action: none;
+    }
+    .footer {
+      border-top: 1px solid var(--border);
+      padding: 12px 18px 16px 18px;
+      background: transparent;
+    }
+    .hint { font-size: 0.8rem; color: var(--muted); line-height: 1.35; }
+    .status {
+      font-size: 0.84rem;
+      color: var(--muted);
+      white-space: pre-line;
+      min-height: 20px;
+      margin-top: 6px;
+    }
+    .row { display: flex; gap: 8px; align-items: center; }
+    .row > * { flex: 1; }
+    .tiny { font-size: 0.75rem; color: var(--muted); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .color-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }
+    .fit-param-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(180px, 1fr));
+      gap: 10px;
+    }
+    .fit-param-card {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: #f8fafc;
+    }
+    .fit-param-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+    .fit-minmax-labels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 8px;
+      margin-bottom: 6px;
+      font-size: 0.75rem;
+      color: #334155;
+      font-weight: 700;
+    }
+    @media (max-width: 1100px) {
+      .app { grid-template-columns: 1fr; }
+      canvas { max-width: calc(100vw - 48px); }
+      .fit-param-grid { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
+    }
+    @media (max-width: 760px) {
+      .fit-param-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <h1>Videoanalyse mit Koordinaten-Overlay</h1>
+
+      <div id="dropzone" class="dropzone">
+        <div>Video hier hineinziehen oder per Explorer auswählen</div>
+        <button id="openFileBtn" class="primary-btn" style="max-width:280px;" type="button">Video öffnen</button>
+      </div>
+      <input id="fileInput" type="file" accept="video/*" style="display:none" />
+
+      <div class="toolbar-tabs">
+        <button class="tab-btn active" data-tab="axes" type="button">Achsen</button>
+        <button class="tab-btn" data-tab="time" type="button">Zeit</button>
+        <button class="tab-btn" data-tab="tracking" type="button">Objektverfolgung</button>
+        <button class="tab-btn" data-tab="diagrams" type="button">Diagramme</button>
+        <button class="tab-btn" data-tab="export" type="button">Export</button>
+      </div>
+
+      <div id="panelAxes" style="display:none">
+        <div class="accordion">
+          <div class="acc-item open">
+            <button class="acc-head" type="button"><span>Maßstab einstellen</span><span>Zwei Punkte anklicken</span></button>
+            <div class="acc-body">
+              <div class="hint" style="margin-bottom:10px;">Sobald dieses Menü geöffnet ist, erscheint im Bild eine Referenzstrecke mit zwei verschiebbaren Punkten. Wenn du den Streckenwert änderst oder die Punkte verschiebst, wird der Maßstab sofort automatisch angepasst.</div>
+              <div class="grid2">
+                <div><label>Strecke [Einheiten]</label><input id="scaleDistanceInput" type="number" min="0.0001" step="0.01" value="1" /></div>
+                <div><label>Einheit</label><input id="scaleUnitInput" type="text" value="m" /></div>
+              </div>
+            </div>
+          </div>
+          <div class="acc-item">
+            <button class="acc-head" type="button"><span>Achsen einstellen</span><span>Farben, Ticks, Bereich</span></button>
+            <div class="acc-body">
+              <div class="color-row">
+                <div><label>Achsenfarbe</label><input id="axisColor" type="color" value="#000000" /></div>
+                <div><label>Gridfarbe</label><input id="gridColor" type="color" value="#000000" /></div>
+              </div>
+              <div class="grid3">
+                <div><label>Achsenstärke</label><input id="axisWidth" type="number" min="0.5" step="0.5" value="3.5" /></div>
+                <div><label>Achsen-Deckkraft</label><input id="axisOpacity" type="number" min="0" max="1" step="0.05" value="0.9" /></div>
+                <div><label>Schriftgröße</label><input id="labelFontSize" type="number" min="8" step="1" value="14" /></div>
+              </div>
+              <div class="grid3">
+                <div><label>Grid-Stärke</label><input id="gridWidth" type="number" min="0.25" step="0.25" value="2" /></div>
+                <div><label>Grid-Deckkraft</label><input id="gridOpacity" type="number" min="0" max="1" step="0.05" value="0.9" /></div>
+                <div><label>Pfeilgröße</label><input id="arrowSize" type="number" min="6" step="1" value="12" /></div>
+              </div>
+              <div class="grid3">
+                <div><label>Tick-Abstand x</label><input id="tickX" type="number" min="0.0001" step="0.1" value="1" /></div>
+                <div><label>Tick-Abstand y</label><input id="tickY" type="number" min="0.0001" step="0.1" value="1" /></div>
+                <div><label>Zahl an jedem n-ten Tick</label><input id="labelEvery" type="number" min="1" step="1" value="1" /></div>
+              </div>
+              <div class="grid2">
+                <div><label>Erste Zahl bei x=</label><input id="labelStartX" type="number" step="any" value="0" /></div>
+                <div><label>Erste Zahl bei y=</label><input id="labelStartY" type="number" step="any" value="0" /></div>
+                <div style="display:flex; align-items:end;">
+                  <label style="display:flex; align-items:center; gap:8px; margin:0;">
+                    <input id="showZeroLabel" type="checkbox" style="width:auto;" />
+                    <span>0 beschriften</span>
+                  </label>
+                </div>
+              </div>
+              <div class="grid2">
+                <div><label>x_min</label><input id="xMinInput" type="number" step="0.1" value="-5" /></div>
+                <div><label>x_max</label><input id="xMaxInput" type="number" step="0.1" value="5" /></div>
+                <div><label>y_min</label><input id="yMinInput" type="number" step="0.1" value="-3" /></div>
+                <div><label>y_max</label><input id="yMaxInput" type="number" step="0.1" value="3" /></div>
+              </div>
+              <div class="grid2">
+                <div><label>Achsenwinkel [°]</label><input id="axisAngleInput" type="number" step="1" value="0" /></div>
+                <div><label>Achsenmodus</label>
+                  <select id="axisDisplayMode">
+                    <option value="both" selected>beide Achsen</option>
+                    <option value="xOnly">nur x-Achse</option>
+                    <option value="yOnly">nur y-Achse</option>
+                  </select>
+                </div>
+              </div>
+              <div class="grid2">
+                <button id="flipXBtn" class="ghost-btn" type="button">x-Richtung umkehren</button>
+                <button id="flipYBtn" class="ghost-btn" type="button">y-Richtung umkehren</button>
+              </div>
+              <div class="grid2">
+                <button id="toggleLabelHandlesBtn" class="ghost-btn" type="button">Label-Griffe ein/aus</button>
+                <div></div>
+              </div>
+              <div class="hint">Am gebogenen Griff nahe dem Ursprung kann das Koordinatensystem gedreht werden.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="panelTime" style="display:none">
+        <div class="accordion">
+          <div class="acc-item">
+            <button class="acc-head" type="button"><span>Zeitstempel einstellen</span><span>Größe, Position, Hintergrund</span></button>
+            <div class="acc-body">
+              <div class="grid3">
+                <div><label>Größe</label><input id="timeFontSize" type="number" min="8" step="1" value="26" /></div>
+                <div><label>X-Position [px]</label><input id="timePosX" type="number" step="1" value="30" /></div>
+                <div><label>Y-Position [px]</label><input id="timePosY" type="number" step="1" value="40" /></div>
+              </div>
+              <div class="grid2">
+                <div><label>Textfarbe</label><input id="timeColor" type="color" value="#ffffff" /></div>
+                <div><label>Deckkraft</label><input id="timeOpacity" type="number" min="0" max="1" step="0.05" value="0.95" /></div>
+              </div>
+              <div class="grid2">
+                <div><label>Hintergrundfarbe</label><input id="timeBgColor" type="color" value="#ffffff" /></div>
+                <div><label>Hintergrund-Deckkraft</label><input id="timeBgOpacity" type="number" min="0" max="1" step="0.05" value="0.85" /></div>
+              </div>
+              <div class="grid2">
+                <button id="toggleTimestampBtn" class="ghost-btn" type="button">Zeitstempel ein/aus</button>
+                <button id="resetTimestampPosBtn" class="ghost-btn" type="button">Position zurücksetzen</button>
+              </div>
+              <div class="grid2">
+                <button id="toggleTimestampBgBtn" class="ghost-btn" type="button">Hintergrundfeld ein/aus</button>
+                <button id="setTimestampBgDefaultBtn" class="ghost-btn" type="button">weißes Feld / schwarze Schrift</button>
+              </div>
+            </div>
+          </div>
+          <div class="acc-item open">
+            <button class="acc-head" type="button"><span>Zeit kalibrieren</span><span>Navigation und Kalibrierung</span></button>
+            <div class="acc-body">
+              <div class="grid2">
+                <div><label>Framerate [fps]</label><input id="fpsInput" type="number" min="0.1" step="0.001" value="30" /></div>
+                <div><label>Aktueller Frame</label><input id="currentFrameInput" type="number" min="0" step="1" value="0" /></div>
+              </div>
+              <div class="grid2">
+                <button id="setT0CurrentFrameBtn" class="primary-btn" type="button">t=0 im aktuellen Frame</button>
+                <button id="restoreDetectedFpsBtn" class="ghost-btn" type="button">Zur erkannten Framerate zurück</button>
+              </div>
+              <div class="hint" style="margin-bottom:10px;">Erkannte Framerate: <span id="detectedFpsText" class="mono">–</span></div>
+
+              <div class="grid2">
+                <div><label>Zeitpunkt A [s]</label><input id="timeCalA" type="number" step="0.001" value="0" /></div>
+                <div><label>Zeitpunkt B [s]</label><input id="timeCalB" type="number" step="0.001" value="1" /></div>
+              </div>
+              <div class="grid2">
+                <button id="captureTimeABtn" class="ghost-btn" type="button">Frame als A merken</button>
+                <button id="captureTimeBBtn" class="ghost-btn" type="button">Frame als B merken</button>
+              </div>
+              <div class="grid2">
+                <button id="applyTimeCalibrationBtn" class="primary-btn" type="button">Framerate aus A/B berechnen</button>
+                <button id="modeTimeBtn" class="ghost-btn" type="button">Zeit-Kalibrierungsmodus</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      
+      <div id="panelTracking" style="display:none">
+        <div class="accordion">
+          <div class="acc-item open">
+            <button class="acc-head" type="button"><span>Objektverfolgung</span><span>Punkte frameweise setzen</span></button>
+            <div class="acc-body">
+              <div class="grid2">
+                <div><label>Markierung in jedem n-ten Frame</label><input id="trackStepInput" type="number" min="1" step="1" value="1" /></div>
+                <div><label>Kreisdurchmesser [px]</label><input id="trackMarkerSize" type="range" min="6" max="90" step="1" value="10" /></div>
+              </div>
+              <div class="grid2">
+                <button id="trackingClearBtn" class="ghost-btn" type="button">Markierungen löschen</button>
+                <button id="trackingUndoBtn" class="ghost-btn" type="button">Letzte Markierung entfernen</button>
+              </div>
+              <div class="hint">Der rote Kreispointer ist sofort sichtbar. Mit der Maus verschieben und loslassen: Im aktuellen Frame wird ein kleiner roter Punkt gestempelt und automatisch zu n+dn gewechselt.</div>
+              <div class="tiny" id="trackingInfo">Noch keine Markierungen.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="panelDiagrams" style="display:none">
+        <div class="accordion">
+          <div class="acc-item open">
+            <button class="acc-head" type="button"><span>Diagramm</span><span>Darstellung aus den verfolgten Daten</span></button>
+            <div class="acc-body">
+              <div class="grid2">
+                <div>
+                  <label>Diagrammtyp</label>
+                  <select id="diagramType">
+                    <option value="xy">x-y</option>
+                    <option value="tx">t-x</option>
+                    <option value="ty">t-y</option>
+                    <option value="tvx">t-v_x</option>
+                    <option value="tvy">t-v_y</option>
+                    <option value="tv">t-v</option>
+                  </select>
+                </div>
+                <div style="display:flex; align-items:end;">
+                  <button id="diagramResetViewBtn" class="ghost-btn" type="button">Diagramm aktualisieren</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="acc-item">
+            <button class="acc-head" type="button"><span>Symbol einstellen</span><span>Datenpunkte</span></button>
+            <div class="acc-body">
+              <div class="grid3">
+                <div>
+                  <label>Symbol</label>
+                  <select id="symbolType">
+                    <option value="dot">Punkt</option>
+                    <option value="cross">Aufrechtes Kreuz</option>
+                    <option value="diagcross">Schräges Kreuz</option>
+                  </select>
+                </div>
+                <div><label>Größe [px]</label><input id="symbolSize" type="number" min="2" step="1" value="8" /></div>
+                <div><label>Farbe</label><input id="symbolColor" type="color" value="#000000" /></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="acc-item">
+            <button class="acc-head" type="button"><span>Fitkurve</span><span>Einblendung und Stil</span></button>
+            <div class="acc-body">
+              <div class="grid3">
+                <div>
+                  <label>Fittyp</label>
+                  <select id="fitType">
+                    <option value="none">keine</option>
+                    <option value="linear">linear</option>
+                    <option value="quadratic">quadratisch</option>
+                    <option value="exponential">exponentiell</option>
+                    <option value="sin">sin</option>
+                    <option value="cos">cos</option>
+                    <option value="expSin">exp.+sin</option>
+                    <option value="expCos">exp.+cos</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Fit-Modus</label>
+                  <select id="fitMode">
+                    <option value="manual" selected>manuell</option>
+                    <option value="auto">auto</option>
+                  </select>
+                </div>
+                <div style="display:flex; align-items:end;">
+                  <label style="display:flex; align-items:center; gap:8px; margin:0;">
+                    <input id="fitVisible" type="checkbox" style="width:auto;" checked />
+                    <span>Sichtbar</span>
+                  </label>
+                </div>
+              </div>
+              <div class="grid3">
+                <div><label>Linienstärke</label><input id="fitWidth" type="number" min="0.5" step="0.5" value="2" /></div>
+                <div><label>Farbe</label><input id="fitColor" type="color" value="#0b3d91" /></div>
+                <div><label>Deckkraft</label><input id="fitOpacity" type="number" min="0" max="1" step="0.05" value="1" /></div>
+                <div><label>Legendenschriftgröße</label><input id="legendFontSize" type="number" min="10" step="1" value="16" /></div>
+              </div>
+              <div class="grid2">
+                <div>
+                  <label>Linienstil</label>
+                  <select id="fitStyle">
+                    <option value="solid">durchgezogen</option>
+                    <option value="dashed">gestrichelt</option>
+                    <option value="dotted">gepunktet</option>
+                  </select>
+                </div>
+                <div style="display:flex; align-items:end;">
+                  <button id="fitRefreshBtn" class="ghost-btn" type="button">Fit neu berechnen</button>
+                </div>
+              </div>
+              <div class="hint">Im manuellen Modus liegen die Parameterschieberegler unten unter dem Diagramm.</div>
+              <div class="tiny" id="fitInfo">Noch keine Fitkurve.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <div id="panelExport" style="display:none">
+        <div class="accordion">
+          <div class="acc-item open">
+            <button class="acc-head" type="button"><span>Export</span><span>Frame oder Video</span></button>
+            <div class="acc-body">
+              <div class="grid2">
+                <button id="exportPngBtn" class="ghost-btn" type="button">Aktuellen Frame als PNG</button>
+                <button id="exportVideoBtn" class="primary-btn" type="button">Video mit Overlay exportieren</button>
+              </div>
+              <div class="status" id="status"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="stage">
+      <div class="toolbar">
+        <div id="fitHeaderEquation" class="fit-header-equation">
+          <span id="fitHeaderType" class="fit-header-type"></span>
+          <span id="fitHeaderFormula" class="fit-header-formula"></span>
+        </div>
+      </div>
+
+      <div class="canvas-wrap">
+        <canvas id="canvas" width="1280" height="720"></canvas>
+        <video id="video" style="display:none" playsinline muted crossorigin="anonymous"></video>
+      </div>
+
+      <div class="footer">
+        <div id="videoFooterControls">
+          <div class="row" style="margin-bottom:8px;">
+            <button id="prevFrameBtn" class="ghost-btn" type="button">◀ 1 Frame</button>
+            <button id="playPauseBtn" class="ghost-btn" type="button">▶ / ❚❚</button>
+            <button id="nextFrameBtn" class="ghost-btn" type="button">1 Frame ▶</button>
+          </div>
+          <div class="timeline-wrap">
+            <div class="timeline-overlay" id="timelineOverlay">
+              <div class="timeline-range" id="timelineRange"></div>
+              <div class="timeline-marker" id="timelineStartMarker"></div>
+              <div class="timeline-marker" id="timelineEndMarker"></div>
+            </div>
+            <input id="timeline" type="range" min="0" max="0" step="0.000001" value="0" />
+          </div>
+          <div class="grid3" style="margin-top:10px;">
+            <button id="setFirstFrameBtn" class="ghost-btn" type="button">als ersten Frame festlegen</button>
+            <button id="setLastFrameBtn" class="ghost-btn" type="button">als letzten Frame festlegen</button>
+            <button id="setT0AsFirstFrameBtn" class="ghost-btn" type="button">Erster Frame bei t=0</button>
+          </div>
+        </div>
+        <div id="diagramFooterControls" style="display:none; margin-top:6px;">
+          <div id="fitParamControls" style="display:none;">
+            <div class="fit-param-grid">
+              <div id="ctrlA" class="fit-param-card">
+                <div class="fit-param-head"><span id="fitParamALabel">a</span><span id="fitParamAVal">1.000</span></div>
+                <input id="fitParamA" type="range" min="-5" max="5" step="0.01" value="1" />
+                <div class="fit-minmax-labels"><span>Min</span><span>Max</span></div>
+                <div class="grid2"><input id="fitParamAMin" type="number" step="0.1" value="-5" /><input id="fitParamAMax" type="number" step="0.1" value="5" /></div>
+              </div>
+              <div id="ctrlB" class="fit-param-card">
+                <div class="fit-param-head"><span>b</span><span id="fitParamBVal">1.000</span></div>
+                <input id="fitParamB" type="range" min="-5" max="5" step="0.01" value="1" />
+                <div class="fit-minmax-labels"><span>Min</span><span>Max</span></div>
+                <div class="grid2"><input id="fitParamBMin" type="number" step="0.1" value="-5" /><input id="fitParamBMax" type="number" step="0.1" value="5" /></div>
+              </div>
+              <div id="ctrlC" class="fit-param-card">
+                <div class="fit-param-head"><span>c</span><span id="fitParamCVal">1.000</span></div>
+                <input id="fitParamC" type="range" min="-5" max="5" step="0.01" value="1" />
+                <div class="fit-minmax-labels"><span>Min</span><span>Max</span></div>
+                <div class="grid2"><input id="fitParamCMin" type="number" step="0.1" value="-5" /><input id="fitParamCMax" type="number" step="0.1" value="5" /></div>
+              </div>
+              <div id="ctrlW" class="fit-param-card">
+                <div class="fit-param-head"><span>w</span><span id="fitParamWVal">1.000</span></div>
+                <input id="fitParamW" type="range" min="-10" max="10" step="0.01" value="1" />
+                <div class="fit-minmax-labels"><span>Min</span><span>Max</span></div>
+                <div class="grid2"><input id="fitParamWMin" type="number" step="0.1" value="-10" /><input id="fitParamWMax" type="number" step="0.1" value="10" /></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="tiny" id="metaText" style="margin-top:8px;">Kein Video geladen.</div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const canvas = $('canvas');
+    const ctx = canvas.getContext('2d');
+    const video = $('video');
+    const statusEl = $('status');
+    const timeline = $('timeline');
+    const metaText = $('metaText');
+
+    const state = {
+      videoUrl: null, loaded: false, playing: false, mode: 'pan',
+      detectedFps: 30, originalDetectedFps: 30, fps: 30, sourceFps: 30, frameCount: 1,
+      t0Frame: 0, currentFrame: 0, firstFrame: 0, lastFrame: null, drag: null,
+      origin: { x: 180, y: 540 }, pxPerUnit: 80, unit: 'm',
+      xMin: -2, xMax: 10, yMin: -5, yMax: 2,
+      axisAngle: 0, axisDisplayMode: 'both', xDir: 1, yDir: 1,
+      xLabelOffsetN: 19, xLabelOffsetT: 10, yLabelOffsetN: 11, yLabelOffsetT: -12, showLabelHandles: false,
+      axis: { color: '#000000', width: 3.5, opacity: 0.9, fontSize: 14, arrowSize: 12 },
+      grid: { color: '#000000', width: 2, opacity: 0.9 },
+      ticks: { x: 1, y: 1, labelEvery: 1, labelStartX: 0, labelStartY: 0, showZero: false },
+      timestamp: { enabled: true, x: 30, y: 40, fontSize: 26, color: '#ffffff', opacity: 0.95, bgEnabled: false, bgColor: '#ffffff', bgOpacity: 0.85 },
+      scalePoints: [],
+      scaleVisible: false,
+      timeCal: { aFrame: null, bFrame: null, aTime: 0, bTime: 1, calibrated: false, anchorFrame: 0, anchorTime: 0 },
+      manualFrameTimeOverrides: new Map(),
+      handleRadius: 10,
+      magnifier: { enabled: false, pointIndex: null, x: 0, y: 0, radius: 70, zoom: 3 },
+      activeTab: 'axes',
+      tracking: { step: 1, markerSize: 10, pointerX: 0, pointerY: 0, hasPointer: false, points: [] },
+      diagram: {
+        type: 'xy',
+        symbolType: 'dot',
+        symbolSize: 8,
+        symbolColor: '#000000',
+        fitType: 'none',
+        fitMode: 'manual',
+        fitVisible: true,
+        fitWidth: 2,
+        fitColor: '#0b3d91',
+        fitOpacity: 1,
+        fitStyle: 'solid',
+        params: { a: 1, b: 1, c: 1, w: 1 },
+        paramRanges: { a: [-5,5], b: [-5,5], c: [-5,5], w: [-10,10] },
+        legendX: 40,
+        legendY: 40,
+        legendFontSize: 16,
+        autoFitLabel: ''
+      }
+    };
+
+    function setStatus(msg) { if (statusEl) statusEl.textContent = msg; }
+    function rgba(hex, alpha) {
+      const h = hex.replace('#', '');
+      const bigint = parseInt(h, 16);
+      const r = (bigint >> 16) & 255;
+      const g = (bigint >> 8) & 255;
+      const b = bigint & 255;
+      return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+    }
+    function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+    function round(v, d = 3) { return Number(v.toFixed(d)); }
+    function niceStep(raw) {
+      if (!isFinite(raw) || raw <= 0) return 1;
+      const exp = Math.floor(Math.log10(raw));
+      const base = raw / Math.pow(10, exp);
+      let nice;
+      if (base <= 1) nice = 1;
+      else if (base <= 2) nice = 2;
+      else if (base <= 5) nice = 5;
+      else nice = 10;
+      return nice * Math.pow(10, exp);
+    }
+
+    function canvasScaleX() {
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width) return 1;
+      return canvas.width / rect.width;
+    }
+
+    function canvasScaleY() {
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.height) return 1;
+      return canvas.height / rect.height;
+    }
+
+    function screenPxToCanvasPx(px) {
+      return px * 0.5 * (canvasScaleX() + canvasScaleY());
+    }
+
+    function setActiveTab(tab) {
+      state.activeTab = tab;
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+      });
+      $('panelAxes').style.display = tab === 'axes' ? 'block' : 'none';
+      $('panelTime').style.display = tab === 'time' ? 'block' : 'none';
+      $('panelTracking').style.display = tab === 'tracking' ? 'block' : 'none';
+      $('panelDiagrams').style.display = tab === 'diagrams' ? 'block' : 'none';
+      $('panelExport').style.display = tab === 'export' ? 'block' : 'none';
+      if ($('videoFooterControls')) $('videoFooterControls').style.display = tab === 'diagrams' ? 'none' : 'block';
+      if ($('diagramFooterControls')) $('diagramFooterControls').style.display = tab === 'diagrams' ? 'block' : 'none';
+      if (tab === 'axes') {
+        const scaleItem = $('panelAxes').querySelector('.acc-item');
+        state.scaleVisible = !!(scaleItem && scaleItem.classList.contains('open'));
+        if (state.scaleVisible) {
+          ensureDefaultScalePoints();
+          applyScaleFromReference();
+        }
+      } else {
+        state.scaleVisible = false;
+      }
+      if (tab === 'tracking') {
+        if (state.tracking.points.length) {
+          const last = state.tracking.points[state.tracking.points.length - 1];
+          state.tracking.pointerX = last.sx;
+          state.tracking.pointerY = last.sy;
+        } else {
+          const p0 = worldToScreen(0, 0);
+          state.tracking.pointerX = p0.x;
+          state.tracking.pointerY = p0.y;
+        }
+        state.tracking.hasPointer = true;
+      }
+      updateNavigationUi();
+      draw();
+    }
+
+    function ensureDefaultScalePoints() {
+      if (state.scalePoints.length === 2) return;
+      const cx = canvas.width * 0.5;
+      const cy = canvas.height * 0.18;
+      const half = Math.max(40, canvas.width * 0.08);
+      state.scalePoints = [
+        { x: cx - half, y: cy },
+        { x: cx + half, y: cy }
+      ];
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
+    });
+    document.querySelectorAll('.acc-head').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const item = btn.closest('.acc-item');
+        if (item) {
+          item.classList.toggle('open');
+          const isScaleHead = btn.textContent.includes('Maßstab einstellen');
+          if (isScaleHead) {
+            state.scaleVisible = item.classList.contains('open');
+            if (state.scaleVisible) {
+              ensureDefaultScalePoints();
+              applyScaleFromReference();
+            }
+            draw();
+          }
+        }
+      });
+    });
+
+
+    function effectiveFrameStep() {
+      return state.activeTab === 'tracking' ? Math.max(1, Math.round(state.tracking.step || 1)) : 1;
+    }
+
+    function updateNavigationUi() {
+      const dn = effectiveFrameStep();
+      $('prevFrameBtn').textContent = '◀ ' + dn + ' Frame';
+      $('nextFrameBtn').textContent = dn + ' Frame ▶';
+      if (state.activeTab === 'tracking' && state.loaded) {
+        timeline.step = 1 / Math.max(state.sourceFps, 1);
+      } else {
+        timeline.step = 0.000001;
+      }
+      if ($('trackingInfo')) {
+        const hasCurrent = state.tracking.points.some(p => p.frame === state.currentFrame);
+        $('trackingInfo').textContent = state.tracking.points.length
+          ? state.tracking.points.length + ' Markierungen gespeichert.' + (hasCurrent ? ' Aktueller Frame hat einen Punkt.' : '')
+          : 'Noch keine Markierungen.';
+      }
+    }
+
+    function getTrackedData() {
+      const pts = [...state.tracking.points].sort((a,b)=>a.frame-b.frame);
+      const data = pts.map(p => ({...p}));
+      const n = data.length;
+      for (let i=0;i<n;i++) {
+        let vx=0, vy=0;
+        if (n >= 2) {
+          if (i === 0) {
+            const dt = data[1].t - data[0].t || 1e-9;
+            vx = (data[1].x - data[0].x) / dt;
+            vy = (data[1].y - data[0].y) / dt;
+          } else if (i === n-1) {
+            const dt = data[i].t - data[i-1].t || 1e-9;
+            vx = (data[i].x - data[i-1].x) / dt;
+            vy = (data[i].y - data[i-1].y) / dt;
+          } else {
+            const dt = data[i+1].t - data[i-1].t || 1e-9;
+            vx = (data[i+1].x - data[i-1].x) / dt;
+            vy = (data[i+1].y - data[i-1].y) / dt;
+          }
+        }
+        data[i].vx = vx;
+        data[i].vy = vy;
+        data[i].v = Math.hypot(vx, vy);
+      }
+      return data;
+    }
+
+    function rgbaFromHex(hex, opacity) {
+      return rgba(hex, opacity);
+    }
+
+    function parseRangeInput(txt, fallback) {
+      try {
+        const parts = String(txt).split(',');
+        if (parts.length !== 2) return fallback;
+        const a = parseFloat(parts[0].trim()), b = parseFloat(parts[1].trim());
+        if (!isFinite(a) || !isFinite(b) || a === b) return fallback;
+        return [Math.min(a,b), Math.max(a,b)];
+      } catch { return fallback; }
+    }
+
+    function manualFitFunction() {
+      const p = state.diagram.params;
+      switch (state.diagram.fitType) {
+        case 'linear': return x => p.a * x + p.b;
+        case 'quadratic': return x => p.a * x * x + p.b * x + p.c;
+        case 'exponential': return x => p.a * Math.exp(p.b * x) + p.c;
+        case 'sin': return x => p.a * Math.sin(p.w * x);
+        case 'cos': return x => p.a * Math.cos(p.w * x);
+        case 'expSin': return x => p.a * Math.exp(-p.b * x) * Math.sin(p.w * x);
+        case 'expCos': return x => p.a * Math.exp(-p.b * x) * Math.cos(p.w * x);
+        default: return null;
+      }
+    }
+
+    function currentFitLabel() {
+      if (state.diagram.fitMode === 'auto') return state.diagram.autoFitLabel || '';
+      const p = state.diagram.params;
+      switch (state.diagram.fitType) {
+        case 'linear': return `y = ${p.a.toFixed(3)} x + ${p.b.toFixed(3)}`;
+        case 'quadratic': return `y = ${p.a.toFixed(3)} x² + ${p.b.toFixed(3)} x + ${p.c.toFixed(3)}`;
+        case 'exponential': return `y = ${p.a.toFixed(3)} e^(${p.b.toFixed(3)}x) + ${p.c.toFixed(3)}`;
+        case 'sin': return `y = ${p.a.toFixed(3)} sin(${p.w.toFixed(3)}x)`;
+        case 'cos': return `y = ${p.a.toFixed(3)} cos(${p.w.toFixed(3)}x)`;
+        case 'expSin': return `y = ${p.a.toFixed(3)} e^(-${p.b.toFixed(3)}x) sin(${p.w.toFixed(3)}x)`;
+        case 'expCos': return `y = ${p.a.toFixed(3)} e^(-${p.b.toFixed(3)}x) cos(${p.w.toFixed(3)}x)`;
+        default: return '';
+      }
+    }
+
+    function drawLegendBox(labelText) {
+      if (!labelText) return;
+      ctx.save();
+      const fs = screenPxToCanvasPx(state.diagram.legendFontSize || 16);
+      ctx.font = fs + 'px Inter, sans-serif';
+      const lines = String(labelText).split('\n');
+      let w = 0;
+      for (const line of lines) w = Math.max(w, ctx.measureText(line).width);
+      const x = state.diagram.legendX, y = state.diagram.legendY;
+      const padX = 12, padY = 10, lineH = fs * 1.25, h = lines.length * lineH + 2 * padY;
+      ctx.fillStyle = 'rgba(255,255,255,0.96)';
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+      const r = 10, bw = w + 2 * padX;
+      ctx.beginPath();
+      ctx.moveTo(x+r,y); ctx.lineTo(x+bw-r,y); ctx.quadraticCurveTo(x+bw,y,x+bw,y+r);
+      ctx.lineTo(x+bw,y+h-r); ctx.quadraticCurveTo(x+bw,y+h,x+bw-r,y+h);
+      ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+      ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#000';
+      lines.forEach((line, i) => ctx.fillText(line, x + padX, y + padY + i * lineH));
+      ctx.restore();
+    }
+
+    function legendRect() {
+      const fs = screenPxToCanvasPx(state.diagram.legendFontSize || 16);
+      ctx.save();
+      ctx.font = fs + 'px Inter, sans-serif';
+      const lines = String(currentFitLabel()).split('\n');
+      let w = 0;
+      for (const line of lines) w = Math.max(w, ctx.measureText(line).width);
+      ctx.restore();
+      return { x: state.diagram.legendX, y: state.diagram.legendY, w: w + 24, h: lines.length * fs * 1.25 + 20 };
+    }
+
+    function fitTypeLabel(fitType) {
+      const names = {
+        linear: 'linear Fit',
+        quadratic: 'Quadratischer Fit',
+        exponential: 'Exponentieller Fit',
+        sin: 'Sinus-Fit',
+        cos: 'Cosinus-Fit',
+        expSin: 'Exp.+Sin-Fit',
+        expCos: 'Exp.+Cos-Fit'
+      };
+      return names[fitType] || 'Fit';
+    }
+
+    function fitTypeFormalEquation(fitType) {
+      const eq = {
+        linear: 'y = m · x + b',
+        quadratic: 'y = a · x² + b · x + c',
+        exponential: 'y = a · e^(b·x) + c',
+        sin: 'y = a · sin(w·x)',
+        cos: 'y = a · cos(w·x)',
+        expSin: 'y = a · e^(-b·x) · sin(w·x)',
+        expCos: 'y = a · e^(-b·x) · cos(w·x)'
+      };
+      return eq[fitType] || '';
+    }
+
+    function updateFitHeaderEquation() {
+      const wrapper = $('fitHeaderEquation');
+      const typeEl = $('fitHeaderType');
+      const formulaEl = $('fitHeaderFormula');
+      if (!wrapper || !typeEl || !formulaEl) return;
+      const show = state.activeTab === 'diagrams' && state.diagram.fitVisible && state.diagram.fitType !== 'none';
+      wrapper.style.display = show ? 'inline-flex' : 'none';
+      if (!show) return;
+      typeEl.textContent = fitTypeLabel(state.diagram.fitType);
+      formulaEl.textContent = fitTypeFormalEquation(state.diagram.fitType);
+    }
+
+    function solveLinearSystem(mat, vec) {
+      const n = vec.length;
+      const a = mat.map(row => row.slice());
+      const b = vec.slice();
+      for (let i=0;i<n;i++) {
+        let maxRow = i;
+        for (let r=i+1;r<n;r++) if (Math.abs(a[r][i]) > Math.abs(a[maxRow][i])) maxRow = r;
+        [a[i], a[maxRow]] = [a[maxRow], a[i]];
+        [b[i], b[maxRow]] = [b[maxRow], b[i]];
+        const piv = a[i][i] || 1e-12;
+        for (let j=i;j<n;j++) a[i][j] /= piv;
+        b[i] /= piv;
+        for (let r=0;r<n;r++) {
+          if (r===i) continue;
+          const f = a[r][i];
+          for (let j=i;j<n;j++) a[r][j] -= f*a[i][j];
+          b[r] -= f*b[i];
+        }
+      }
+      return b;
+    }
+
+    function fitLinear(xs, ys) {
+      const n = xs.length;
+      if (n < 2) return null;
+      let sx=0, sy=0, sxx=0, sxy=0;
+      for (let i=0;i<n;i++) { sx += xs[i]; sy += ys[i]; sxx += xs[i]*xs[i]; sxy += xs[i]*ys[i]; }
+      const denom = n*sxx - sx*sx;
+      if (Math.abs(denom) < 1e-12) return null;
+      const m = (n*sxy - sx*sy)/denom;
+      const b = (sy - m*sx)/n;
+      return { fn: x => m*x + b, label: `y = ${m.toFixed(3)} x + ${b.toFixed(3)}` };
+    }
+
+    
+    function fitQuadratic(xs, ys) {
+      const n = xs.length;
+      if (n < 3) return null;
+      let s1=n,sx=0,sx2=0,sx3=0,sx4=0,sy=0,sxy=0,sx2y=0;
+      for (let i=0;i<n;i++) {
+        const x=xs[i], y=ys[i], x2=x*x;
+        sx += x; sx2 += x2; sx3 += x2*x; sx4 += x2*x2;
+        sy += y; sxy += x*y; sx2y += x2*y;
+      }
+      const coeff = solveLinearSystem([[sx4,sx3,sx2],[sx3,sx2,sx],[sx2,sx,s1]],[sx2y,sxy,sy]);
+      const [a,b,c] = coeff;
+      return { fn: x => a*x*x + b*x + c, label: `y = ${a.toFixed(3)} x² + ${b.toFixed(3)} x + ${c.toFixed(3)}` };
+    }
+
+    
+    function fitExponential(xs, ys) {
+      if (xs.length < 2) return null;
+      const c = Math.min(...ys) - 1e-6;
+      const lx=[], ly=[];
+      for (let i=0;i<xs.length;i++) {
+        const val = ys[i]-c;
+        if (val <= 0) continue;
+        lx.push(xs[i]); ly.push(Math.log(val));
+      }
+      if (lx.length < 2) return null;
+      const lin = fitLinear(lx, ly);
+      if (!lin) return null;
+      const m = lin.fn(1)-lin.fn(0);
+      const a = Math.exp(lin.fn(0));
+      return { fn: x => a*Math.exp(m*x)+c, label: `y = ${a.toFixed(3)} e^(${m.toFixed(3)}x) + ${c.toFixed(3)}` };
+    }
+
+    
+    function fitOscillation(xs, ys, mode) {
+      if (xs.length < 2) return null;
+      const xmin = Math.min(...xs), xmax = Math.max(...xs);
+      const span = Math.max(1e-6, xmax-xmin);
+      const amp = Math.max(1e-6, (Math.max(...ys)-Math.min(...ys))/2);
+      const w = 2*Math.PI/span;
+      if (mode === 'sin') return { fn: x => amp*Math.sin(w*(x-xmin)), label: `y = ${amp.toFixed(3)} sin(${w.toFixed(3)}x)` };
+      if (mode === 'cos') return { fn: x => amp*Math.cos(w*(x-xmin)), label: `y = ${amp.toFixed(3)} cos(${w.toFixed(3)}x)` };
+      const b = 1/span;
+      if (mode === 'expSin') return { fn: x => amp*Math.exp(-b*(x-xmin))*Math.sin(w*(x-xmin)), label: `y = ${amp.toFixed(3)} e^(-${b.toFixed(3)}x) sin(${w.toFixed(3)}x)` };
+      if (mode === 'expCos') return { fn: x => amp*Math.exp(-b*(x-xmin))*Math.cos(w*(x-xmin)), label: `y = ${amp.toFixed(3)} e^(-${b.toFixed(3)}x) cos(${w.toFixed(3)}x)` };
+      return null;
+    }
+
+    
+    function getDiagramSeries() {
+      const data = getTrackedData();
+      if (!data.length) return null;
+      const t = data.map(p=>p.t), x = data.map(p=>p.x), y = data.map(p=>p.y), vx = data.map(p=>p.vx), vy = data.map(p=>p.vy), v = data.map(p=>p.v);
+      switch (state.diagram.type) {
+        case 'xy': return { xs:x, ys:y, xLabel:'x / '+state.unit, yLabel:'y / '+state.unit };
+        case 'tx': return { xs:t, ys:x, xLabel:'t / s', yLabel:'x / '+state.unit };
+        case 'ty': return { xs:t, ys:y, xLabel:'t / s', yLabel:'y / '+state.unit };
+        case 'tvx': return { xs:t, ys:vx, xLabel:'t / s', yLabel:'v_x / '+state.unit+'/s' };
+        case 'tvy': return { xs:t, ys:vy, xLabel:'t / s', yLabel:'v_y / '+state.unit+'/s' };
+        case 'tv': return { xs:t, ys:v, xLabel:'t / s', yLabel:'v / '+state.unit+'/s' };
+      }
+      return null;
+    }
+
+    function computeFitFunction(series) {
+      if (state.diagram.fitMode === 'manual') return manualFitFunction();
+      const xs = series.xs, ys = series.ys;
+      switch (state.diagram.fitType) {
+        case 'linear': return fitLinear(xs, ys);
+        case 'quadratic': return fitQuadratic(xs, ys);
+        case 'exponential': return fitExponential(xs, ys);
+        case 'sin': return fitOscillation(xs, ys, 'sin');
+        case 'cos': return fitOscillation(xs, ys, 'cos');
+        case 'expSin': return fitOscillation(xs, ys, 'expSin');
+        case 'expCos': return fitOscillation(xs, ys, 'expCos');
+        default: return null;
+      }
+    }
+
+    function drawSymbol(x, y) {
+      ctx.save();
+      ctx.strokeStyle = state.diagram.symbolColor;
+      ctx.fillStyle = state.diagram.symbolColor;
+      const s = screenPxToCanvasPx(state.diagram.symbolSize);
+      ctx.lineWidth = 2;
+      if (state.diagram.symbolType === 'dot') {
+        ctx.beginPath(); ctx.arc(x, y, s*0.35, 0, Math.PI*2); ctx.fill();
+      } else if (state.diagram.symbolType === 'cross') {
+        ctx.beginPath();
+        ctx.moveTo(x-s/2, y); ctx.lineTo(x+s/2, y);
+        ctx.moveTo(x, y-s/2); ctx.lineTo(x, y+s/2);
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(x-s/2, y-s/2); ctx.lineTo(x+s/2, y+s/2);
+        ctx.moveTo(x-s/2, y+s/2); ctx.lineTo(x+s/2, y-s/2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawDiagram() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const series = getDiagramSeries();
+      if (!series || !series.xs.length) {
+        ctx.fillStyle = '#64748b';
+        ctx.font = '28px Inter, sans-serif';
+        ctx.fillText('Noch keine Verfolgungsdaten vorhanden', 40, 60);
+        updateFitHeaderEquation();
+        updateMeta();
+        return;
+      }
+      const margin = {left: 120, right: 60, top: 50, bottom: 100};
+      const xs = series.xs, ys = series.ys;
+      let xmin = Math.min(...xs), xmax = Math.max(...xs), ymin = Math.min(...ys), ymax = Math.max(...ys);
+      if (Math.abs(xmax-xmin) < 1e-9) { xmin -= 1; xmax += 1; }
+      if (Math.abs(ymax-ymin) < 1e-9) { ymin -= 1; ymax += 1; }
+      const xpad = 0.08*(xmax-xmin), ypad = 0.08*(ymax-ymin);
+      xmin -= xpad; xmax += xpad; ymin -= ypad; ymax += ypad;
+      const plotW = canvas.width - margin.left - margin.right;
+      const plotH = canvas.height - margin.top - margin.bottom;
+      const sx = x => margin.left + (x-xmin)/(xmax-xmin)*plotW;
+      const sy = y => margin.top + plotH - (y-ymin)/(ymax-ymin)*plotH;
+
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(margin.left, margin.top, plotW, plotH);
+
+      // zero lines
+      if (xmin <= 0 && xmax >= 0) {
+        ctx.beginPath(); ctx.moveTo(sx(0), margin.top); ctx.lineTo(sx(0), margin.top+plotH); ctx.stroke();
+      }
+      if (ymin <= 0 && ymax >= 0) {
+        ctx.beginPath(); ctx.moveTo(margin.left, sy(0)); ctx.lineTo(margin.left+plotW, sy(0)); ctx.stroke();
+      }
+
+      // simple ticks
+      ctx.fillStyle = '#000';
+      ctx.font = screenPxToCanvasPx(16) + 'px Inter, sans-serif';
+      for (let i=0;i<=6;i++) {
+        const xv = xmin + i*(xmax-xmin)/6;
+        const px = sx(xv);
+        ctx.beginPath(); ctx.moveTo(px, margin.top+plotH); ctx.lineTo(px, margin.top+plotH+6); ctx.stroke();
+        const lblx = (Math.round(xv*1000)/1000).toString(); const wl = ctx.measureText(lblx).width; ctx.fillText(lblx, px-wl/2, margin.top+plotH+16);
+      }
+      for (let i=0;i<=6;i++) {
+        const yv = ymin + i*(ymax-ymin)/6;
+        const py = sy(yv);
+        ctx.beginPath(); ctx.moveTo(margin.left-6, py); ctx.lineTo(margin.left, py); ctx.stroke();
+        const lbly = (Math.round(yv*1000)/1000).toString(); ctx.fillText(lbly, 14, py+5);
+      }
+      const xlabw = ctx.measureText(series.xLabel).width; ctx.fillText(series.xLabel, margin.left + plotW/2 - xlabw/2, canvas.height - 28);
+      ctx.save();
+      ctx.translate(40, margin.top + plotH/2 + 60);
+      ctx.rotate(-Math.PI/2);
+      ctx.fillText(series.yLabel, 0, 0);
+      ctx.restore();
+
+      // points
+      for (let i=0;i<xs.length;i++) drawSymbol(sx(xs[i]), sy(ys[i]));
+
+      // fit
+      let fitLabel = '';
+      if (state.diagram.fitVisible && state.diagram.fitType !== 'none') {
+        const fitObj = computeFitFunction(series);
+        const fitFn = fitObj ? (fitObj.fn || fitObj) : null;
+        if (fitFn) {
+          ctx.save();
+          ctx.strokeStyle = rgbaFromHex(state.diagram.fitColor, state.diagram.fitOpacity);
+          ctx.lineWidth = screenPxToCanvasPx(state.diagram.fitWidth);
+          if (state.diagram.fitStyle === 'dashed') ctx.setLineDash([10,6]);
+          if (state.diagram.fitStyle === 'dotted') ctx.setLineDash([2,6]);
+          ctx.beginPath();
+          const n=250;
+          for (let i=0;i<n;i++) {
+            const x = xmin + i*(xmax-xmin)/(n-1);
+            const y = fitFn(x);
+            const px = sx(x), py = sy(y);
+            if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+          }
+          ctx.stroke();
+          ctx.restore();
+          if (state.diagram.fitMode === 'auto') state.diagram.autoFitLabel = fitObj && fitObj.label ? fitObj.label : ('Auto-Fit: ' + state.diagram.fitType);
+          fitLabel = currentFitLabel();
+          $('fitInfo').textContent = 'Fit dargestellt: ' + state.diagram.fitType + ' (' + state.diagram.fitMode + ')';
+        } else {
+          $('fitInfo').textContent = 'Fit konnte mit den aktuellen Daten nicht berechnet werden.';
+        }
+      } else {
+        $('fitInfo').textContent = state.diagram.fitType === 'none' ? 'Keine Fitkurve ausgewählt.' : 'Fit ausgeblendet.';
+      }
+      updateFitHeaderEquation();
+      drawLegendBox(fitLabel);
+      updateMeta();
+    }
+
+    function renderTrackingOverlay() {
+      ctx.save();
+      const stamped = state.tracking.points.find(p => p.frame === state.currentFrame);
+      if (stamped) {
+        const r = screenPxToCanvasPx(8)/2;
+        ctx.fillStyle = '#ff0000';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(stamped.sx, stamped.sy, r, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      }
+      if (state.activeTab === 'tracking' && state.tracking.hasPointer) {
+        const r = screenPxToCanvasPx(state.tracking.markerSize)/2;
+        ctx.strokeStyle = '#d00000';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(state.tracking.pointerX, state.tracking.pointerY, r, 0, Math.PI*2); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(state.tracking.pointerX-r, state.tracking.pointerY); ctx.lineTo(state.tracking.pointerX+r, state.tracking.pointerY);
+        ctx.moveTo(state.tracking.pointerX, state.tracking.pointerY-r); ctx.lineTo(state.tracking.pointerX, state.tracking.pointerY+r);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function updateUiFromState() {
+      $('fpsInput').value = state.fps;
+            $('currentFrameInput').value = state.currentFrame;
+      $('detectedFpsText').textContent = state.detectedFps ? state.detectedFps.toFixed(3) : 'nicht erkannt';
+      $('axisColor').value = state.axis.color;
+      $('gridColor').value = state.grid.color;
+      $('axisWidth').value = state.axis.width;
+      $('axisOpacity').value = state.axis.opacity;
+      $('labelFontSize').value = state.axis.fontSize;
+      $('gridWidth').value = state.grid.width;
+      $('gridOpacity').value = state.grid.opacity;
+      $('arrowSize').value = state.axis.arrowSize;
+      $('tickX').value = state.ticks.x;
+      $('tickY').value = state.ticks.y;
+      $('labelEvery').value = state.ticks.labelEvery;
+      if ($('labelStartTick')) if ($('labelStartX')) $('labelStartX').value = state.ticks.labelStartX;
+      if ($('labelStartY')) $('labelStartY').value = state.ticks.labelStartY;
+      if ($('showZeroLabel')) $('showZeroLabel').checked = !!state.ticks.showZero;
+      $('xMinInput').value = state.xMin;
+      $('xMaxInput').value = state.xMax;
+      $('yMinInput').value = state.yMin;
+      $('yMaxInput').value = state.yMax;
+      if ($('axisAngleInput')) $('axisAngleInput').value = state.axisAngle;
+      if ($('axisDisplayMode')) $('axisDisplayMode').value = state.axisDisplayMode;
+      $('scaleUnitInput').value = state.unit;
+      $('timeFontSize').value = state.timestamp.fontSize;
+      $('timePosX').value = state.timestamp.x;
+      $('timePosY').value = state.timestamp.y;
+      $('timeColor').value = state.timestamp.color;
+      $('timeOpacity').value = state.timestamp.opacity;
+      $('timeBgColor').value = state.timestamp.bgColor;
+      $('timeBgOpacity').value = state.timestamp.bgOpacity;
+      if ($('trackStepInput')) $('trackStepInput').value = state.tracking.step;
+      if ($('trackMarkerSize')) $('trackMarkerSize').value = state.tracking.markerSize;
+      if ($('diagramType')) $('diagramType').value = state.diagram.type;
+      if ($('symbolType')) $('symbolType').value = state.diagram.symbolType;
+      if ($('symbolSize')) $('symbolSize').value = state.diagram.symbolSize;
+      if ($('symbolColor')) $('symbolColor').value = state.diagram.symbolColor;
+      if ($('fitType')) $('fitType').value = state.diagram.fitType;
+      if ($('fitMode')) $('fitMode').value = state.diagram.fitMode;
+      if ($('fitMode')) $('fitMode').value = state.diagram.fitMode;
+      if ($('fitVisible')) $('fitVisible').checked = !!state.diagram.fitVisible;
+      if ($('fitWidth')) $('fitWidth').value = state.diagram.fitWidth;
+      if ($('fitColor')) $('fitColor').value = state.diagram.fitColor;
+      if ($('fitOpacity')) $('fitOpacity').value = state.diagram.fitOpacity;
+      if ($('fitStyle')) $('fitStyle').value = state.diagram.fitStyle;
+      if ($('legendFontSize')) $('legendFontSize').value = state.diagram.legendFontSize;
+      if ($('fitParamA')) $('fitParamA').value = state.diagram.params.a;
+      if ($('fitParamALabel')) $('fitParamALabel').textContent = state.diagram.fitType === 'linear' ? 'm' : 'a';
+      if ($('fitParamAVal')) $('fitParamAVal').textContent = Number(state.diagram.params.a).toFixed(3);
+      if ($('fitParamBVal')) $('fitParamBVal').textContent = Number(state.diagram.params.b).toFixed(3);
+      if ($('fitParamCVal')) $('fitParamCVal').textContent = Number(state.diagram.params.c).toFixed(3);
+      if ($('fitParamWVal')) $('fitParamWVal').textContent = Number(state.diagram.params.w).toFixed(3);
+      if ($('fitParamB')) $('fitParamB').value = state.diagram.params.b;
+      if ($('fitParamC')) $('fitParamC').value = state.diagram.params.c;
+      if ($('fitParamW')) $('fitParamW').value = state.diagram.params.w;
+      if ($('fitParamAMin')) $('fitParamAMin').value = state.diagram.paramRanges.a[0];
+      if ($('fitParamAMax')) $('fitParamAMax').value = state.diagram.paramRanges.a[1];
+      if ($('fitParamBMin')) $('fitParamBMin').value = state.diagram.paramRanges.b[0];
+      if ($('fitParamBMax')) $('fitParamBMax').value = state.diagram.paramRanges.b[1];
+      if ($('fitParamCMin')) $('fitParamCMin').value = state.diagram.paramRanges.c[0];
+      if ($('fitParamCMax')) $('fitParamCMax').value = state.diagram.paramRanges.c[1];
+      if ($('fitParamWMin')) $('fitParamWMin').value = state.diagram.paramRanges.w[0];
+      if ($('fitParamWMax')) $('fitParamWMax').value = state.diagram.paramRanges.w[1];
+      if ($('fitParamControls')) $('fitParamControls').style.display = (state.activeTab === 'diagrams' && state.diagram.fitMode === 'manual' && state.diagram.fitType !== 'none') ? 'block' : 'none';
+      if ($('ctrlA')) $('ctrlA').style.display = ['linear','quadratic','exponential','sin','cos','expSin','expCos'].includes(state.diagram.fitType) ? 'block' : 'none';
+      if ($('ctrlB')) $('ctrlB').style.display = ['linear','quadratic','exponential','expSin','expCos'].includes(state.diagram.fitType) ? 'block' : 'none';
+      if ($('ctrlC')) $('ctrlC').style.display = ['quadratic','exponential'].includes(state.diagram.fitType) ? 'block' : 'none';
+      if ($('ctrlW')) $('ctrlW').style.display = ['sin','cos','expSin','expCos'].includes(state.diagram.fitType) ? 'block' : 'none';
+      updateNavigationUi();
+    }
+
+    function syncStateFromUi() {
+      state.fps = Math.max(0.001, parseFloat($('fpsInput').value) || 30);
+      if (!state.timeCal.calibrated) {
+        state.sourceFps = state.fps;
+        if (state.loaded) state.frameCount = Math.max(1, Math.round(video.duration * state.sourceFps));
+      }
+      state.axis.color = $('axisColor').value;
+      state.grid.color = $('gridColor').value;
+      state.axis.width = Math.max(0.1, parseFloat($('axisWidth').value) || 2.5);
+      state.axis.opacity = clamp(parseFloat($('axisOpacity').value) || 0.9, 0, 1);
+      state.axis.fontSize = Math.max(6, parseFloat($('labelFontSize').value) || 18);
+      state.grid.width = Math.max(0.1, parseFloat($('gridWidth').value) || 1);
+      state.grid.opacity = clamp(parseFloat($('gridOpacity').value) || 0.35, 0, 1);
+      state.axis.arrowSize = Math.max(4, parseFloat($('arrowSize').value) || 12);
+      state.ticks.x = Math.max(0.000001, parseFloat($('tickX').value) || 1);
+      state.ticks.y = Math.max(0.000001, parseFloat($('tickY').value) || 1);
+      state.ticks.labelEvery = Math.max(1, Math.round(parseFloat($('labelEvery').value) || 1));
+      if ($('labelStartTick')) if ($('labelStartX')) state.ticks.labelStartX = parseFloat($('labelStartX').value) || 0;
+      if ($('labelStartY')) state.ticks.labelStartY = parseFloat($('labelStartY').value) || 0;
+      if ($('showZeroLabel')) state.ticks.showZero = !!$('showZeroLabel').checked;
+      state.xMin = parseFloat($('xMinInput').value) || -5;
+      state.xMax = parseFloat($('xMaxInput').value) || 5;
+      state.yMin = parseFloat($('yMinInput').value) || -3;
+      state.yMax = parseFloat($('yMaxInput').value) || 3;
+      if ($('axisAngleInput')) state.axisAngle = parseFloat($('axisAngleInput').value) || 0;
+      if ($('axisDisplayMode')) state.axisDisplayMode = $('axisDisplayMode').value || 'both';
+      state.unit = $('scaleUnitInput').value.trim() || 'm';
+      state.timestamp.fontSize = Math.max(6, parseFloat($('timeFontSize').value) || 26);
+      state.timestamp.x = parseFloat($('timePosX').value) || 30;
+      state.timestamp.y = parseFloat($('timePosY').value) || 40;
+      state.timestamp.color = $('timeColor').value;
+      state.timestamp.opacity = clamp(parseFloat($('timeOpacity').value) || 0.95, 0, 1);
+      state.timestamp.bgColor = $('timeBgColor').value;
+      state.timestamp.bgOpacity = clamp(parseFloat($('timeBgOpacity').value) || 0.85, 0, 1);
+      state.timeCal.aTime = parseFloat($('timeCalA').value) || 0;
+      state.timeCal.bTime = parseFloat($('timeCalB').value) || 1;
+      if ($('trackStepInput')) state.tracking.step = Math.max(1, Math.round(parseFloat($('trackStepInput').value) || 1));
+      if ($('trackMarkerSize')) state.tracking.markerSize = Math.max(4, parseFloat($('trackMarkerSize').value) || 10);
+      if ($('diagramType')) state.diagram.type = $('diagramType').value || 'xy';
+      if ($('symbolType')) state.diagram.symbolType = $('symbolType').value || 'dot';
+      if ($('symbolSize')) state.diagram.symbolSize = Math.max(2, parseFloat($('symbolSize').value) || 8);
+      if ($('symbolColor')) state.diagram.symbolColor = $('symbolColor').value;
+      if ($('fitType')) state.diagram.fitType = $('fitType').value || 'none';
+      if ($('fitMode')) state.diagram.fitMode = $('fitMode').value || 'manual';
+      if ($('fitMode')) state.diagram.fitMode = $('fitMode').value || 'manual';
+      if ($('fitVisible')) state.diagram.fitVisible = !!$('fitVisible').checked;
+      if ($('fitWidth')) state.diagram.fitWidth = Math.max(0.5, parseFloat($('fitWidth').value) || 2);
+      if ($('fitColor')) state.diagram.fitColor = $('fitColor').value;
+      if ($('fitOpacity')) state.diagram.fitOpacity = clamp(parseFloat($('fitOpacity').value) || 1, 0, 1);
+      if ($('fitStyle')) state.diagram.fitStyle = $('fitStyle').value || 'solid';
+      if ($('legendFontSize')) state.diagram.legendFontSize = Math.max(10, parseFloat($('legendFontSize').value) || 16);
+      if ($('fitParamA')) state.diagram.params.a = parseFloat($('fitParamA').value) || 1;
+      if ($('fitParamB')) state.diagram.params.b = parseFloat($('fitParamB').value) || 1;
+      if ($('fitParamC')) state.diagram.params.c = parseFloat($('fitParamC').value) || 1;
+      if ($('fitParamW')) state.diagram.params.w = parseFloat($('fitParamW').value) || 1;
+      if ($('fitParamAMin') && $('fitParamAMax')) state.diagram.paramRanges.a = [parseFloat($('fitParamAMin').value) || -5, parseFloat($('fitParamAMax').value) || 5];
+      if ($('fitParamBMin') && $('fitParamBMax')) state.diagram.paramRanges.b = [parseFloat($('fitParamBMin').value) || -5, parseFloat($('fitParamBMax').value) || 5];
+      if ($('fitParamCMin') && $('fitParamCMax')) state.diagram.paramRanges.c = [parseFloat($('fitParamCMin').value) || -5, parseFloat($('fitParamCMax').value) || 5];
+      if ($('fitParamWMin') && $('fitParamWMax')) state.diagram.paramRanges.w = [parseFloat($('fitParamWMin').value) || -10, parseFloat($('fitParamWMax').value) || 10];
+      if ($('fitParamA')) { $('fitParamA').min = state.diagram.paramRanges.a[0]; $('fitParamA').max = state.diagram.paramRanges.a[1]; }
+      if ($('fitParamB')) { $('fitParamB').min = state.diagram.paramRanges.b[0]; $('fitParamB').max = state.diagram.paramRanges.b[1]; }
+      if ($('fitParamC')) { $('fitParamC').min = state.diagram.paramRanges.c[0]; $('fitParamC').max = state.diagram.paramRanges.c[1]; }
+      if ($('fitParamW')) { $('fitParamW').min = state.diagram.paramRanges.w[0]; $('fitParamW').max = state.diagram.paramRanges.w[1]; }
+      updateUiFromState();
+      updateNavigationUi();
+      draw();
+    }
+
+    function resizeCanvasToVideo() {
+      if (!video.videoWidth || !video.videoHeight) return;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      state.origin = { x: canvas.width * 0.14, y: canvas.height * 0.8 };
+    }
+
+    function frameToTime(frame) {
+      if (state.manualFrameTimeOverrides.has(frame)) return state.manualFrameTimeOverrides.get(frame);
+      if (state.timeCal.calibrated) {
+        return state.timeCal.anchorTime + (frame - state.timeCal.anchorFrame) / state.fps;
+      }
+      return (frame - state.t0Frame) / state.fps;
+    }
+    function currentVideoFrame() { return Math.round(video.currentTime * state.sourceFps); }
+
+    function totalFrames() {
+      return Math.max(0, state.frameCount - 1);
+    }
+
+    function clampToSelectedRange(frame) {
+      const start = Math.min(state.firstFrame, state.lastFrame ?? totalFrames());
+      const end = Math.max(state.firstFrame, state.lastFrame ?? totalFrames());
+      return clamp(frame, start, end);
+    }
+
+    function updateTimelineSelection() {
+      const maxF = Math.max(1, totalFrames());
+      const first = clamp(state.firstFrame ?? 0, 0, maxF);
+      const last = clamp((state.lastFrame ?? maxF), 0, maxF);
+      const start = Math.min(first, last);
+      const end = Math.max(first, last);
+      const startPct = (start / maxF) * 100;
+      const endPct = (end / maxF) * 100;
+      const range = $('timelineRange');
+      const startMarker = $('timelineStartMarker');
+      const endMarker = $('timelineEndMarker');
+      range.style.left = startPct + '%';
+      range.style.width = Math.max(0, endPct - startPct) + '%';
+      startMarker.style.left = 'calc(' + startPct + '% - 1px)';
+      endMarker.style.left = 'calc(' + endPct + '% - 1px)';
+      range.style.display = 'block';
+      startMarker.style.display = 'block';
+      endMarker.style.display = 'block';
+    }
+
+    function seekVideo(time) {
+      return new Promise((resolve) => {
+        const onSeeked = () => {
+          video.removeEventListener('seeked', onSeeked);
+          resolve();
+        };
+        video.addEventListener('seeked', onSeeked, { once: true });
+        video.currentTime = clamp(time, 0, Math.max(0, video.duration || time));
+      });
+    }
+
+    async function gotoFrame(frame) {
+      if (!state.loaded) return;
+      const maxFrame = totalFrames();
+      const target = clampToSelectedRange(clamp(Math.round(frame), 0, maxFrame));
+      state.currentFrame = target;
+      $('currentFrameInput').value = target;
+      const t = clamp(target / state.sourceFps, 0, Math.max(0, video.duration - 1 / Math.max(state.sourceFps, 1)));
+      await seekVideo(t);
+      draw();
+    }
+
+    async function stepFrame(delta) {
+      if (!state.loaded) return;
+      await gotoFrame(state.currentFrame + delta);
+    }
+
+    async function loadVideoFile(file) {
+      if (!file) return;
+      if (state.videoUrl) URL.revokeObjectURL(state.videoUrl);
+      state.videoUrl = URL.createObjectURL(file);
+      state.loaded = false;
+      setStatus('Video wird geladen ...');
+
+      const ok = await new Promise((resolve) => {
+        const onLoaded = () => { cleanup(); resolve(true); };
+        const onError = () => { cleanup(); resolve(false); };
+        function cleanup() {
+          video.removeEventListener('loadedmetadata', onLoaded);
+          video.removeEventListener('canplay', onLoaded);
+          video.removeEventListener('error', onError);
+        }
+        video.addEventListener('loadedmetadata', onLoaded, { once: true });
+        video.addEventListener('canplay', onLoaded, { once: true });
+        video.addEventListener('error', onError, { once: true });
+        video.src = state.videoUrl;
+        video.load();
+      });
+
+      if (!ok || !video.videoWidth || !video.videoHeight) {
+        setStatus('Video konnte nicht geladen werden.');
+        draw();
+        return;
+      }
+
+      resizeCanvasToVideo();
+      timeline.max = Math.max(video.duration, 0);
+      timeline.value = 0;
+      state.loaded = true;
+      state.detectedFps = 30;
+      state.originalDetectedFps = 30;
+      state.fps = 30;
+      state.sourceFps = state.detectedFps;
+      state.frameCount = Math.max(1, Math.round(video.duration * state.sourceFps));
+      state.t0Frame = 0;
+      state.currentFrame = 0;
+      state.firstFrame = 0;
+      state.lastFrame = Math.max(0, state.frameCount - 1);
+      state.timeCal.calibrated = false;
+      state.timeCal.anchorFrame = 0;
+      state.timeCal.anchorTime = 0;
+      state.manualFrameTimeOverrides.clear();
+      autoSetupRanges();
+      ensureDefaultScalePoints();
+      updateUiFromState();
+      await gotoFrame(0);
+      setStatus('Video geladen: ' + file.name);
+    }
+
+    function autoSetupRanges() {
+      const marginPx = 40;
+      state.xMin = round((marginPx - state.origin.x) / state.pxPerUnit, 2);
+      state.xMax = round((canvas.width - marginPx - state.origin.x) / state.pxPerUnit, 2);
+      state.yMin = round((state.origin.y - (canvas.height - marginPx)) / state.pxPerUnit, 2);
+      state.yMax = round((state.origin.y - marginPx) / state.pxPerUnit, 2);
+
+      const xHalf = Math.max(Math.abs(state.xMin), Math.abs(state.xMax));
+      const yHalf = Math.max(Math.abs(state.yMin), Math.abs(state.yMax));
+      const commonHalf = Math.max(xHalf, yHalf);
+
+      state.xMin = -commonHalf;
+      state.xMax = commonHalf;
+      state.yMin = -commonHalf;
+      state.yMax = commonHalf;
+
+      autoTicks();
+    }
+
+    function applyScaleFromReference() {
+      if (!(state.scaleVisible && state.scalePoints.length === 2)) return;
+      const dpx = Math.hypot(state.scalePoints[1].x - state.scalePoints[0].x, state.scalePoints[1].y - state.scalePoints[0].y);
+      const dReal = parseFloat($('scaleDistanceInput').value);
+      if (!(dpx > 0) || !(dReal > 0)) return;
+      state.pxPerUnit = dpx / dReal;
+      state.unit = $('scaleUnitInput').value.trim() || 'm';
+      autoSetupRanges();
+      updateUiFromState();
+      draw();
+    }
+
+    function autoTicks() {
+      const xSpan = Math.max(1e-9, state.xMax - state.xMin);
+      const ySpan = Math.max(1e-9, state.yMax - state.yMin);
+      const common = niceStep(Math.max(xSpan / 8, ySpan / 6));
+      state.ticks.x = common;
+      state.ticks.y = common;
+      state.ticks.labelEvery = 1;
+      state.ticks.labelStartX = 0; state.ticks.labelStartY = 0;
+      state.ticks.showZero = false;
+      updateUiFromState();
+      draw();
+    }
+
+    function worldToScreen(x, y) {
+      const th = state.axisAngle * Math.PI / 180;
+      const c = Math.cos(th), s = Math.sin(th);
+      const xr = state.xDir * x;
+      const yr = state.yDir * y;
+      const dx = (xr * c - yr * s) * state.pxPerUnit;
+      const dy = -(xr * s + yr * c) * state.pxPerUnit;
+      return { x: state.origin.x + dx, y: state.origin.y + dy };
+    }
+    function screenToWorld(x, y) {
+      const dx = (x - state.origin.x) / state.pxPerUnit;
+      const dy = -(y - state.origin.y) / state.pxPerUnit;
+      const th = state.axisAngle * Math.PI / 180;
+      const c = Math.cos(th), s = Math.sin(th);
+      const xr = dx * c + dy * s;
+      const yr = -dx * s + dy * c;
+      return { x: xr / state.xDir, y: yr / state.yDir };
+    }
+
+    function drawArrow(x1, y1, x2, y2, color, width, arrowSize) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      const angle = Math.atan2(y2 - y1, x2 - x1);
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - arrowSize * Math.cos(angle - Math.PI / 6), y2 - arrowSize * Math.sin(angle - Math.PI / 6));
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - arrowSize * Math.cos(angle + Math.PI / 6), y2 - arrowSize * Math.sin(angle + Math.PI / 6));
+      ctx.stroke();
+    }
+
+    function formatTick(v) {
+      const av = Math.abs(v);
+      if (av >= 1000 || (av > 0 && av < 0.01)) return v.toExponential(1);
+      if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v));
+      return String(round(v, 3));
+    }
+
+    function axisHandles() {
+      const arrowInset = Math.max(18, screenPxToCanvasPx(state.axis.arrowSize) + 6) / state.pxPerUnit;
+      const xLeft = worldToScreen(state.xMin, 0);
+      const xRight = worldToScreen(Math.max(state.xMin, state.xMax - arrowInset), 0);
+      const yBottom = worldToScreen(0, state.yMin);
+      const yTop = worldToScreen(0, Math.max(state.yMin, state.yMax - arrowInset));
+      const rotR = screenPxToCanvasPx(26);
+      const rotAng = (state.axisAngle + 45) * Math.PI / 180;
+      return {
+        xMin: { x: xLeft.x, y: xLeft.y, cursor: 'ew-resize' },
+        xMax: { x: xRight.x, y: xRight.y, cursor: 'ew-resize' },
+        yMin: { x: yBottom.x, y: yBottom.y, cursor: 'ns-resize' },
+        yMax: { x: yTop.x, y: yTop.y, cursor: 'ns-resize' },
+        rotate: { x: state.origin.x + rotR * Math.cos(rotAng), y: state.origin.y - rotR * Math.sin(rotAng), cursor: 'grab' }
+      };
+    }
+
+    function labelHandles() {
+      const xTick = state.ticks.x * Math.max(1, state.ticks.labelEvery);
+      const yTick = state.ticks.y * Math.max(1, state.ticks.labelEvery);
+
+      const xBase = worldToScreen(Math.min(state.xMax, Math.max(state.xMin, xTick)), 0);
+      const xAlong = worldToScreen(Math.min(state.xMax, Math.max(state.xMin, xTick + 0.001)), 0);
+      const xNormal = worldToScreen(Math.min(state.xMax, Math.max(state.xMin, xTick)), 0.001);
+      const xTVx = xAlong.x - xBase.x, xTVy = xAlong.y - xBase.y;
+      const xTNorm = Math.hypot(xTVx, xTVy) || 1;
+      const xTx = xTVx / xTNorm, xTy = xTVy / xTNorm;
+      const xNVx = xNormal.x - xBase.x, xNVy = xNormal.y - xBase.y;
+      const xNNorm = Math.hypot(xNVx, xNVy) || 1;
+      const xNx = xNVx / xNNorm, xNy = xNVy / xNNorm;
+
+      const yBase = worldToScreen(0, Math.min(state.yMax, Math.max(state.yMin, yTick)));
+      const yAlong = worldToScreen(0, Math.min(state.yMax, Math.max(state.yMin, yTick + 0.001)));
+      const yNormal = worldToScreen(0.001, Math.min(state.yMax, Math.max(state.yMin, yTick)));
+      const yTVx = yAlong.x - yBase.x, yTVy = yAlong.y - yBase.y;
+      const yTNorm = Math.hypot(yTVx, yTVy) || 1;
+      const yTx = yTVx / yTNorm, yTy = yTVy / yTNorm;
+      const yNVx = yNormal.x - yBase.x, yNVy = yNormal.y - yBase.y;
+      const yNNorm = Math.hypot(yNVx, yNVy) || 1;
+      const yNx = yNVx / yNNorm, yNy = yNVy / yNNorm;
+
+      return {
+        xLabel: {
+          x: xBase.x + xNx * state.xLabelOffsetN + xTx * state.xLabelOffsetT,
+          y: xBase.y + xNy * state.xLabelOffsetN + xTy * state.xLabelOffsetT,
+          cursor: 'move'
+        },
+        yLabel: {
+          x: yBase.x + yNx * state.yLabelOffsetN + yTx * state.yLabelOffsetT,
+          y: yBase.y + yNy * state.yLabelOffsetN + yTy * state.yLabelOffsetT,
+          cursor: 'move'
+        },
+        xNormal: { x: xNx, y: xNy },
+        xTangent: { x: xTx, y: xTy },
+        yNormal: { x: yNx, y: yNy },
+        yTangent: { x: yTx, y: yTy }
+      };
+    }
+
+    function drawHandle(x, y, fill) {
+      ctx.save();
+      ctx.fillStyle = fill;
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y, state.handleRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawGridAndAxes() {
+      const axisColor = rgba(state.axis.color, state.axis.opacity);
+      const gridColor = rgba(state.grid.color, state.grid.opacity);
+      const fsize = screenPxToCanvasPx(state.axis.fontSize);
+      const showX = state.axisDisplayMode !== 'yOnly';
+      const showY = state.axisDisplayMode !== 'xOnly';
+
+      ctx.save();
+      ctx.font = fsize + 'px Inter, Arial, sans-serif';
+      ctx.textBaseline = 'top';
+
+      if (showX && showY) {
+        ctx.strokeStyle = gridColor;
+        ctx.lineWidth = screenPxToCanvasPx(state.grid.width);
+        for (let x = Math.ceil(state.xMin / state.ticks.x) * state.ticks.x; x <= state.xMax + 1e-12; x += state.ticks.x) {
+          const p1 = worldToScreen(x, state.yMin);
+          const p2 = worldToScreen(x, state.yMax);
+          ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+        }
+        for (let y = Math.ceil(state.yMin / state.ticks.y) * state.ticks.y; y <= state.yMax + 1e-12; y += state.ticks.y) {
+          const p1 = worldToScreen(state.xMin, y);
+          const p2 = worldToScreen(state.xMax, y);
+          ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+        }
+      }
+
+      const axisW = screenPxToCanvasPx(state.axis.width);
+      const arrowSize = screenPxToCanvasPx(state.axis.arrowSize);
+      const tickLen = screenPxToCanvasPx(8);
+      ctx.strokeStyle = axisColor;
+      ctx.fillStyle = axisColor;
+      ctx.lineWidth = axisW;
+
+      if (showX) {
+        const xLeft = worldToScreen(state.xMin, 0);
+        const xRight = worldToScreen(state.xMax, 0);
+        drawArrow(xLeft.x, xLeft.y, xRight.x, xRight.y, axisColor, axisW, arrowSize);
+        let i = 0;
+        for (let x = Math.ceil(state.xMin / state.ticks.x) * state.ticks.x; x <= state.xMax + 1e-12; x += state.ticks.x, i++) {
+          if (Math.abs(x - state.xMax) < 1e-9) continue;
+          const p = worldToScreen(x, 0);
+          const q = worldToScreen(x, 0.001);
+          const a = worldToScreen(x + 0.001, 0);
+          const vx = q.x - p.x, vy = q.y - p.y;
+          const norm = Math.hypot(vx, vy) || 1;
+          const nx = vx / norm, ny = vy / norm;
+          const tvx = a.x - p.x, tvy = a.y - p.y;
+          const tnorm = Math.hypot(tvx, tvy) || 1;
+          const tx = tvx / tnorm, ty = tvy / tnorm;
+          ctx.beginPath();
+          ctx.moveTo(p.x - nx * tickLen, p.y - ny * tickLen);
+          ctx.lineTo(p.x + nx * tickLen, p.y + ny * tickLen);
+          ctx.stroke();
+          const dx = x - state.ticks.labelStartX;
+          const step = state.ticks.x;
+          const k = dx / step;
+          const shouldLabelX = Math.abs(k - Math.round(k)) < 1e-6 && (Math.round(k) % state.ticks.labelEvery === 0);
+          const isZeroX = Math.abs(x) <= 1e-12;
+          if (shouldLabelX && (state.ticks.showZero || !isZeroX)) {
+            const txt = formatTick(x);
+            const w = ctx.measureText(txt).width;
+            ctx.fillText(txt, p.x + nx * state.xLabelOffsetN + tx * state.xLabelOffsetT - w / 2, p.y + ny * state.xLabelOffsetN + ty * state.xLabelOffsetT);
+          }
+        }
+      }
+
+      if (showY) {
+        const yBottom = worldToScreen(0, state.yMin);
+        const yTop = worldToScreen(0, state.yMax);
+        drawArrow(yBottom.x, yBottom.y, yTop.x, yTop.y, axisColor, axisW, arrowSize);
+        let i = 0;
+        for (let y = Math.ceil(state.yMin / state.ticks.y) * state.ticks.y; y <= state.yMax + 1e-12; y += state.ticks.y, i++) {
+          if (Math.abs(y - state.yMax) < 1e-9) continue;
+          const p = worldToScreen(0, y);
+          const q = worldToScreen(0.001, y);
+          const a = worldToScreen(0, y + 0.001);
+          const vx = q.x - p.x, vy = q.y - p.y;
+          const norm = Math.hypot(vx, vy) || 1;
+          const nx = vx / norm, ny = vy / norm;
+          const tvx = a.x - p.x, tvy = a.y - p.y;
+          const tnorm = Math.hypot(tvx, tvy) || 1;
+          const tx = tvx / tnorm, ty = tvy / tnorm;
+          ctx.beginPath();
+          ctx.moveTo(p.x - nx * tickLen, p.y - ny * tickLen);
+          ctx.lineTo(p.x + nx * tickLen, p.y + ny * tickLen);
+          ctx.stroke();
+          const dy = y - state.ticks.labelStartY;
+          const step = state.ticks.y;
+          const k = dy / step;
+          const shouldLabelY = Math.abs(k - Math.round(k)) < 1e-6 && (Math.round(k) % state.ticks.labelEvery === 0);
+          const isZeroY = Math.abs(y) <= 1e-12;
+          if (shouldLabelY && (state.ticks.showZero || !isZeroY)) {
+            const txt = formatTick(y);
+            ctx.fillText(txt, p.x + nx * state.yLabelOffsetN + tx * state.yLabelOffsetT, p.y + ny * state.yLabelOffsetN + ty * state.yLabelOffsetT - fsize * 0.5);
+          }
+        }
+      }
+
+      if (showX && showY) ctx.fillText('0', state.origin.x + 8, state.origin.y + 8);
+
+      const hs = axisHandles();
+      if (showX) {
+        drawHandle(hs.xMin.x, hs.xMin.y, '#fde68a');
+        drawHandle(hs.xMax.x, hs.xMax.y, '#fde68a');
+      }
+      if (showY) {
+        drawHandle(hs.yMin.x, hs.yMin.y, '#fca5a5');
+        drawHandle(hs.yMax.x, hs.yMax.y, '#fca5a5');
+      }
+      drawHandle(state.origin.x, state.origin.y, '#93c5fd');
+
+      // rotation guide and handle
+      const rr = screenPxToCanvasPx(22);
+      ctx.strokeStyle = 'rgba(15,23,42,0.75)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(state.origin.x, state.origin.y, rr, -0.2 * Math.PI, 0.75 * Math.PI);
+      ctx.stroke();
+      drawHandle(hs.rotate.x, hs.rotate.y, '#cbd5e1');
+      const lhs = labelHandles();
+      if (state.showLabelHandles) {
+        if (showX) drawHandle(lhs.xLabel.x, lhs.xLabel.y, '#bfdbfe');
+        if (showY) drawHandle(lhs.yLabel.x, lhs.yLabel.y, '#bfdbfe');
+      }
+
+      if (state.scaleVisible && state.scalePoints.length > 0) {
+        ctx.strokeStyle = '#f59e0b';
+        ctx.fillStyle = '#f59e0b';
+        ctx.lineWidth = 2;
+        state.scalePoints.forEach((p, idx) => {
+          ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, Math.PI * 2); ctx.fill();
+          ctx.fillText(String(idx + 1), p.x + 10, p.y - 14);
+        });
+        if (state.scalePoints.length === 2) {
+          ctx.beginPath(); ctx.moveTo(state.scalePoints[0].x, state.scalePoints[0].y); ctx.lineTo(state.scalePoints[1].x, state.scalePoints[1].y); ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+
+    function drawTimestamp() {
+      if (!state.timestamp.enabled) return;
+      const txt = 't = ' + frameToTime(state.currentFrame).toFixed(3) + ' s';
+      ctx.save();
+      const tsFont = screenPxToCanvasPx(state.timestamp.fontSize);
+      ctx.font = tsFont + 'px Inter, Arial, sans-serif';
+      ctx.textBaseline = 'top';
+      const w = ctx.measureText(txt).width;
+      const padX = 10;
+      const padY = 6;
+      const boxW = w + 2 * padX;
+      const boxH = tsFont + 2 * padY;
+      if (state.timestamp.bgEnabled) {
+        const x = state.timestamp.x - padX;
+        const y = state.timestamp.y - padY;
+        const r = 10;
+        ctx.fillStyle = rgba(state.timestamp.bgColor, state.timestamp.bgOpacity);
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + boxW - r, y);
+        ctx.quadraticCurveTo(x + boxW, y, x + boxW, y + r);
+        ctx.lineTo(x + boxW, y + boxH - r);
+        ctx.quadraticCurveTo(x + boxW, y + boxH, x + boxW - r, y + boxH);
+        ctx.lineTo(x + r, y + boxH);
+        ctx.quadraticCurveTo(x, y + boxH, x, y + boxH - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.fillStyle = rgba(state.timestamp.color, state.timestamp.opacity);
+      ctx.fillText(txt, state.timestamp.x, state.timestamp.y);
+      ctx.restore();
+    }
+
+    function drawMagnifier() {
+      if (!state.magnifier.enabled || state.magnifier.pointIndex == null) return;
+      const sourceX = state.magnifier.x;
+      const sourceY = state.magnifier.y;
+      const r = state.magnifier.radius;
+      const zoom = state.magnifier.zoom;
+
+      let lensX = sourceX + r + 24;
+      let lensY = sourceY - r - 24;
+      if (lensX + r > canvas.width - 8) lensX = sourceX - r - 24;
+      if (lensX - r < 8) lensX = sourceX + r + 24;
+      if (lensY - r < 8) lensY = sourceY + r + 24;
+      if (lensY + r > canvas.height - 8) lensY = sourceY - r - 24;
+
+      const sampleR = r / zoom;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(lensX, lensY, r, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+
+      ctx.drawImage(
+        canvas,
+        sourceX - sampleR, sourceY - sampleR, sampleR * 2, sampleR * 2,
+        lensX - r, lensY - r, r * 2, r * 2
+      );
+
+      ctx.restore();
+
+      ctx.save();
+      ctx.strokeStyle = 'rgba(15,23,42,0.95)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(lensX, lensY, r, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(220,38,38,0.9)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(lensX - r, lensY);
+      ctx.lineTo(lensX + r, lensY);
+      ctx.moveTo(lensX, lensY - r);
+      ctx.lineTo(lensX, lensY + r);
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(15,23,42,0.35)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(sourceX, sourceY);
+      ctx.lineTo(lensX, lensY);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function draw() {
+      if (state.activeTab === 'diagrams') {
+        drawDiagram();
+        return;
+      }
+      updateFitHeaderEquation();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (state.loaded) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      } else {
+        ctx.fillStyle = '#dbe4ef';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#64748b';
+        ctx.font = '28px Inter, sans-serif';
+        ctx.fillText('Video per Drag-and-drop oder Dateidialog laden', 40, 60);
+      }
+      drawGridAndAxes();
+      drawTimestamp();
+      renderTrackingOverlay();
+      drawMagnifier();
+      updateMeta();
+    }
+
+    function updateMeta() {
+      if (!state.loaded) {
+        metaText.textContent = 'Kein Video geladen.';
+        return;
+      }
+      const currentTime = frameToTime(state.currentFrame).toFixed(3);
+      const totalF = totalFrames();
+      const abInfo = (state.timeCal.aFrame != null && state.timeCal.bFrame != null)
+        ? ' | A: n=' + state.timeCal.aFrame + ', t=' + (parseFloat($('timeCalA').value) || 0).toFixed(3) + ' s'
+          + ' | B: n=' + state.timeCal.bFrame + ', t=' + (parseFloat($('timeCalB').value) || 0).toFixed(3) + ' s'
+        : '';
+      metaText.textContent = 'Video: ' + video.videoWidth + '×' + video.videoHeight + ' px | Dauer: ' + video.duration.toFixed(3) + ' s | fps: ' + state.fps.toFixed(3) + ' | Frame: ' + state.currentFrame + '/' + totalF + ' | Auswahl: ' + state.firstFrame + '–' + (state.lastFrame ?? totalF) + ' | t = ' + currentTime + ' s' + abInfo;
+      timeline.max = video.duration;
+      timeline.value = video.currentTime;
+      updateTimelineSelection();
+      updateNavigationUi();
+    }
+
+    function pointerPos(evt) {
+      const rect = canvas.getBoundingClientRect();
+      return { x: (evt.clientX - rect.left) * (canvas.width / rect.width), y: (evt.clientY - rect.top) * (canvas.height / rect.height) };
+    }
+    function hitCircle(p, c, r) {
+      return Math.hypot(p.x - c.x, p.y - c.y) <= (r || (state.handleRadius + 4));
+    }
+
+    function timestampRect() {
+      ctx.save();
+      const tsFont = screenPxToCanvasPx(state.timestamp.fontSize);
+      ctx.font = tsFont + 'px Inter, Arial, sans-serif';
+      const txt = 't = ' + frameToTime(state.currentFrame).toFixed(3) + ' s';
+      const w = ctx.measureText(txt).width;
+      ctx.restore();
+      const padX = state.timestamp.bgEnabled ? 10 : 6;
+      const padY = state.timestamp.bgEnabled ? 6 : 4;
+      return { x: state.timestamp.x - padX, y: state.timestamp.y - padY, w: w + 2 * padX, h: tsFont + 2 * padY };
+    }
+
+    function pointInRect(p, r) {
+      return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+    }
+
+    canvas.addEventListener('pointerdown', async (evt) => {
+      const p = pointerPos(evt);
+      canvas.setPointerCapture(evt.pointerId);
+      if (state.activeTab === 'tracking') {
+        if (!state.loaded) return;
+        const r = screenPxToCanvasPx(state.tracking.markerSize)/2 + 6;
+        const dx = p.x - state.tracking.pointerX, dy = p.y - state.tracking.pointerY;
+        if (Math.hypot(dx, dy) <= r) {
+          state.drag = { type: 'trackingPointer', offsetX: dx, offsetY: dy };
+        } else {
+          state.tracking.pointerX = p.x;
+          state.tracking.pointerY = p.y;
+          state.drag = { type: 'trackingPointer', offsetX: 0, offsetY: 0 };
+          draw();
+        }
+        return;
+      }
+      if (state.activeTab === 'diagrams') {
+        const lr = legendRect();
+        if (p.x >= lr.x && p.x <= lr.x + lr.w && p.y >= lr.y && p.y <= lr.y + lr.h) {
+          state.drag = { type: 'legend', offsetX: p.x - state.diagram.legendX, offsetY: p.y - state.diagram.legendY };
+          return;
+        }
+      }
+      const hs = axisHandles();
+      const lhs = labelHandles();
+      if (state.scaleVisible && state.scalePoints.length === 2) {
+        if (hitCircle(p, state.scalePoints[0], 12)) {
+          state.drag = { type: 'scalePoint0', offsetX: p.x - state.scalePoints[0].x, offsetY: p.y - state.scalePoints[0].y };
+          state.magnifier.enabled = true;
+          state.magnifier.pointIndex = 0;
+          state.magnifier.x = state.scalePoints[0].x;
+          state.magnifier.y = state.scalePoints[0].y;
+          return;
+        }
+        if (hitCircle(p, state.scalePoints[1], 12)) {
+          state.drag = { type: 'scalePoint1', offsetX: p.x - state.scalePoints[1].x, offsetY: p.y - state.scalePoints[1].y };
+          state.magnifier.enabled = true;
+          state.magnifier.pointIndex = 1;
+          state.magnifier.x = state.scalePoints[1].x;
+          state.magnifier.y = state.scalePoints[1].y;
+          return;
+        }
+      }
+      if (state.showLabelHandles && hitCircle(p, lhs.xLabel, 12)) {
+        state.drag = { type: 'xLabelDrag', startX: p.x, startY: p.y, startOffsetN: state.xLabelOffsetN, startOffsetT: state.xLabelOffsetT, nx: lhs.xNormal.x, ny: lhs.xNormal.y, tx: lhs.xTangent.x, ty: lhs.xTangent.y };
+        return;
+      }
+      if (state.showLabelHandles && hitCircle(p, lhs.yLabel, 12)) {
+        state.drag = { type: 'yLabelDrag', startX: p.x, startY: p.y, startOffsetN: state.yLabelOffsetN, startOffsetT: state.yLabelOffsetT, nx: lhs.yNormal.x, ny: lhs.yNormal.y, tx: lhs.yTangent.x, ty: lhs.yTangent.y };
+        return;
+      }
+      if (hitCircle(p, state.origin)) {
+        state.drag = { type: 'origin', offsetX: p.x - state.origin.x, offsetY: p.y - state.origin.y };
+        return;
+      }
+      for (const key of Object.keys(hs)) {
+        if (hitCircle(p, hs[key])) {
+          state.drag = { type: key };
+          return;
+        }
+      }
+      if (state.timestamp.enabled && pointInRect(p, timestampRect())) {
+        state.drag = { type: 'timestamp', offsetX: p.x - state.timestamp.x, offsetY: p.y - state.timestamp.y };
+        return;
+      }
+      if (state.mode === 'origin') {
+        state.origin = { x: p.x, y: p.y };
+        autoSetupRanges();
+        updateUiFromState();
+        draw();
+        return;
+      }
+      if (state.mode === 'pan') {
+        state.drag = { type: 'pan', startX: p.x, startY: p.y, ox: state.origin.x, oy: state.origin.y };
+      }
+    });
+
+    canvas.addEventListener('pointermove', (evt) => {
+      const p = pointerPos(evt);
+      if (state.activeTab === 'tracking') {
+        state.tracking.hasPointer = true;
+        canvas.style.cursor = 'crosshair';
+        if (state.drag && state.drag.type === 'trackingPointer') {
+          state.tracking.pointerX = p.x - state.drag.offsetX;
+          state.tracking.pointerY = p.y - state.drag.offsetY;
+        }
+        draw();
+        return;
+      }
+      if (state.activeTab === 'diagrams') {
+        if (state.drag && state.drag.type === 'legend') {
+          state.diagram.legendX = p.x - state.drag.offsetX;
+          state.diagram.legendY = p.y - state.drag.offsetY;
+          draw();
+          return;
+        }
+      }
+      let cursor = 'default';
+      const hs = axisHandles();
+      const lhs = labelHandles();
+      if (state.scaleVisible && state.scalePoints.length === 2) {
+        if (hitCircle(p, state.scalePoints[0], 12) || hitCircle(p, state.scalePoints[1], 12)) cursor = 'move';
+      }
+      if (state.showLabelHandles && (hitCircle(p, lhs.xLabel, 12) || hitCircle(p, lhs.yLabel, 12))) cursor = 'move';
+      if (hitCircle(p, state.origin)) cursor = 'move';
+      for (const key of Object.keys(hs)) {
+        if (hitCircle(p, hs[key])) cursor = hs[key].cursor || 'move';
+      }
+      if (state.timestamp.enabled && pointInRect(p, timestampRect())) cursor = 'move';
+      canvas.style.cursor = cursor;
+      if (!state.drag) return;
+      if (state.drag.type === 'xLabelDrag') {
+        const dx = p.x - state.drag.startX;
+        const dy = p.y - state.drag.startY;
+        state.xLabelOffsetN = Math.max(6, state.drag.startOffsetN + dx * state.drag.nx + dy * state.drag.ny);
+        state.xLabelOffsetT = state.drag.startOffsetT + dx * state.drag.tx + dy * state.drag.ty;
+        draw();
+      } else if (state.drag.type === 'yLabelDrag') {
+        const dx = p.x - state.drag.startX;
+        const dy = p.y - state.drag.startY;
+        state.yLabelOffsetN = Math.max(6, state.drag.startOffsetN + dx * state.drag.nx + dy * state.drag.ny);
+        state.yLabelOffsetT = state.drag.startOffsetT + dx * state.drag.tx + dy * state.drag.ty;
+        draw();
+      } else if (state.drag.type === 'rotate') {
+        const ang = Math.atan2(state.origin.y - p.y, p.x - state.origin.x) * 180 / Math.PI;
+        state.axisAngle = round(ang, 1);
+        if ($('axisAngleInput')) $('axisAngleInput').value = state.axisAngle;
+        draw();
+      } else if (state.drag.type === 'scalePoint0') {
+        state.scalePoints[0].x = p.x - state.drag.offsetX;
+        state.scalePoints[0].y = p.y - state.drag.offsetY;
+        state.magnifier.enabled = true;
+        state.magnifier.pointIndex = 0;
+        state.magnifier.x = state.scalePoints[0].x;
+        state.magnifier.y = state.scalePoints[0].y;
+        applyScaleFromReference();
+      } else if (state.drag.type === 'scalePoint1') {
+        state.scalePoints[1].x = p.x - state.drag.offsetX;
+        state.scalePoints[1].y = p.y - state.drag.offsetY;
+        state.magnifier.enabled = true;
+        state.magnifier.pointIndex = 1;
+        state.magnifier.x = state.scalePoints[1].x;
+        state.magnifier.y = state.scalePoints[1].y;
+        applyScaleFromReference();
+      } else if (state.drag.type === 'origin') {
+        state.origin.x = p.x - state.drag.offsetX;
+        state.origin.y = p.y - state.drag.offsetY;
+        draw();
+      } else if (state.drag.type === 'timestamp') {
+        state.timestamp.x = p.x - state.drag.offsetX;
+        state.timestamp.y = p.y - state.drag.offsetY;
+        $('timePosX').value = round(state.timestamp.x, 0);
+        $('timePosY').value = round(state.timestamp.y, 0);
+        draw();
+      } else if (state.drag.type === 'xMin') {
+        const w = screenToWorld(p.x, state.origin.y);
+        state.xMin = Math.min(w.x, state.xMax - 1e-6);
+        $('xMinInput').value = round(state.xMin, 3);
+        draw();
+      } else if (state.drag.type === 'xMax') {
+        const w = screenToWorld(p.x, state.origin.y);
+        state.xMax = Math.max(w.x, state.xMin + 1e-6);
+        $('xMaxInput').value = round(state.xMax, 3);
+        draw();
+      } else if (state.drag.type === 'yMin') {
+        const w = screenToWorld(state.origin.x, p.y);
+        state.yMin = Math.min(w.y, state.yMax - 1e-6);
+        $('yMinInput').value = round(state.yMin, 3);
+        draw();
+      } else if (state.drag.type === 'yMax') {
+        const w = screenToWorld(state.origin.x, p.y);
+        state.yMax = Math.max(w.y, state.yMin + 1e-6);
+        $('yMaxInput').value = round(state.yMax, 3);
+        draw();
+      } else if (state.drag.type === 'pan') {
+        state.origin.x = state.drag.ox + (p.x - state.drag.startX);
+        state.origin.y = state.drag.oy + (p.y - state.drag.startY);
+        draw();
+      }
+    });
+    canvas.addEventListener('pointerup', async () => {
+      if (state.activeTab === 'tracking' && state.drag && state.drag.type === 'trackingPointer') {
+        const world = screenToWorld(state.tracking.pointerX, state.tracking.pointerY);
+        const existingIndex = state.tracking.points.findIndex(pt => pt.frame === state.currentFrame);
+        const entry = { frame: state.currentFrame, t: frameToTime(state.currentFrame), sx: state.tracking.pointerX, sy: state.tracking.pointerY, x: world.x, y: world.y };
+        if (existingIndex >= 0) state.tracking.points[existingIndex] = entry;
+        else state.tracking.points.push(entry);
+        state.tracking.points.sort((a,b)=>a.frame-b.frame);
+        state.drag = null;
+        updateNavigationUi();
+        draw();
+        await gotoFrame(state.currentFrame + effectiveFrameStep());
+        return;
+      }
+      state.drag = null;
+      state.magnifier.enabled = false;
+      state.magnifier.pointIndex = null;
+      updateUiFromState();
+      draw();
+    });
+    canvas.addEventListener('pointercancel', () => { state.drag = null; state.magnifier.enabled = false; state.magnifier.pointIndex = null; draw(); });
+    canvas.addEventListener('pointerleave', () => {
+      if (state.activeTab !== 'tracking') {
+        state.tracking.hasPointer = false;
+        draw();
+      }
+    });
+
+    $('openFileBtn').addEventListener('click', () => $('fileInput').click());
+    $('fileInput').addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) await loadVideoFile(file);
+    });
+
+    const dropzone = $('dropzone');
+    ['dragenter', 'dragover'].forEach(type => {
+      dropzone.addEventListener(type, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.add('active');
+      });
+    });
+    ['dragleave', 'drop'].forEach(type => {
+      dropzone.addEventListener(type, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (type === 'drop') {
+          const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+          dropzone.classList.remove('active');
+          if (file) loadVideoFile(file);
+        } else {
+          dropzone.classList.remove('active');
+        }
+      });
+    });
+    window.addEventListener('dragover', (e) => e.preventDefault());
+    window.addEventListener('drop', (e) => e.preventDefault());
+
+    $('prevFrameBtn').addEventListener('click', () => stepFrame(-effectiveFrameStep()));
+    $('nextFrameBtn').addEventListener('click', () => stepFrame(effectiveFrameStep()));
+    $('playPauseBtn').addEventListener('click', async () => {
+      if (!state.loaded) return;
+      if (video.paused) {
+        try { await video.play(); } catch (e) {}
+      } else {
+        video.pause();
+      }
+    });
+    video.addEventListener('timeupdate', () => {
+      if (!state.loaded) return;
+      state.currentFrame = currentVideoFrame();
+      $('currentFrameInput').value = state.currentFrame;
+      draw();
+    });
+    timeline.addEventListener('input', async (e) => {
+      if (!state.loaded) return;
+      await seekVideo(parseFloat(e.target.value) || 0);
+      state.currentFrame = clampToSelectedRange(currentVideoFrame());
+      if (state.activeTab === 'tracking') {
+        const dn = effectiveFrameStep();
+        state.currentFrame = Math.round(state.currentFrame / dn) * dn;
+        state.currentFrame = clampToSelectedRange(state.currentFrame);
+      }
+      await seekVideo(state.currentFrame / state.sourceFps);
+      $('currentFrameInput').value = state.currentFrame;
+      draw();
+    });
+    $('currentFrameInput').addEventListener('change', () => gotoFrame(parseInt($('currentFrameInput').value, 10) || 0));
+
+    document.querySelectorAll('input, select').forEach(el => {
+      if (!['fileInput', 'timeline', 'currentFrameInput'].includes(el.id)) {
+        el.addEventListener('input', syncStateFromUi);
+        el.addEventListener('change', syncStateFromUi);
+      }
+    });
+
+    if ($('modePanBtn')) $('modePanBtn').addEventListener('click', () => { state.mode = 'pan'; setStatus('Modus: Achsen verschieben'); });
+    if ($('modeOriginBtn')) $('modeOriginBtn').addEventListener('click', () => { state.mode = 'origin'; setStatus('Modus: Ursprung setzen'); });
+    $('modeTimeBtn').addEventListener('click', () => { state.mode = 'time'; setStatus('Modus: Zeit kalibrieren'); setActiveTab('time'); });
+    $('scaleDistanceInput').addEventListener('input', () => { applyScaleFromReference(); });
+    $('scaleDistanceInput').addEventListener('change', () => { applyScaleFromReference(); });
+    $('scaleUnitInput').addEventListener('input', () => { applyScaleFromReference(); });
+    $('setT0CurrentFrameBtn').addEventListener('click', () => {
+      state.t0Frame = state.currentFrame;
+      state.timeCal.calibrated = false;
+      state.timeCal.anchorFrame = state.currentFrame;
+      state.timeCal.anchorTime = 0;
+      draw();
+      setStatus('t=0 wurde auf den aktuellen Frame gesetzt.');
+    });
+    $('captureTimeABtn').addEventListener('click', () => { state.timeCal.aFrame = state.currentFrame; setStatus('Zeit-Kalibrierung: Frame A = ' + state.timeCal.aFrame); });
+    $('captureTimeBBtn').addEventListener('click', () => { state.timeCal.bFrame = state.currentFrame; setStatus('Zeit-Kalibrierung: Frame B = ' + state.timeCal.bFrame); });
+    $('applyTimeCalibrationBtn').addEventListener('click', () => {
+      const aF = state.timeCal.aFrame;
+      const bF = state.timeCal.bFrame;
+      const aT = parseFloat($('timeCalA').value);
+      const bT = parseFloat($('timeCalB').value);
+      if (aF == null || bF == null || aF === bF || !isFinite(aT) || !isFinite(bT) || aT === bT) {
+        setStatus('Zeit-Kalibrierung unvollständig oder ungültig.');
+        return;
+      }
+      const dt = (bT - aT) / (bF - aF);
+      if (!isFinite(dt) || dt === 0) {
+        setStatus('Zeit-Kalibrierung unzulässig.');
+        return;
+      }
+      state.fps = Math.abs(1 / dt);
+      state.timeCal.calibrated = true;
+      state.timeCal.anchorFrame = aF;
+      state.timeCal.anchorTime = aT;
+      updateUiFromState();
+      draw();
+      setStatus('Neue Framerate aus Kalibrierung: ' + state.fps.toFixed(6) + ' fps (Framezahl bleibt unverändert).');
+    });
+    $('restoreDetectedFpsBtn').addEventListener('click', () => {
+      state.fps = state.originalDetectedFps;
+      state.timeCal.calibrated = false;
+      state.sourceFps = state.originalDetectedFps;
+      if (state.loaded) {
+        state.frameCount = Math.max(1, Math.round(video.duration * state.sourceFps));
+        state.lastFrame = Math.min(state.lastFrame ?? (state.frameCount - 1), state.frameCount - 1);
+      }
+      updateUiFromState();
+      draw();
+      setStatus('Zur ursprünglich erkannten Framerate zurückgekehrt.');
+    });
+
+            if ($('flipXBtn')) $('flipXBtn').addEventListener('click', () => { state.xDir *= -1; draw(); });
+    if ($('flipYBtn')) $('flipYBtn').addEventListener('click', () => { state.yDir *= -1; draw(); });
+    if ($('toggleLabelHandlesBtn')) $('toggleLabelHandlesBtn').addEventListener('click', () => { state.showLabelHandles = !state.showLabelHandles; draw(); });
+    $('toggleTimestampBtn').addEventListener('click', () => { state.timestamp.enabled = !state.timestamp.enabled; draw(); });
+    $('resetTimestampPosBtn').addEventListener('click', () => {
+      state.timestamp.x = 30;
+      state.timestamp.y = 40;
+      updateUiFromState();
+      draw();
+    });
+    $('toggleTimestampBgBtn').addEventListener('click', () => {
+      state.timestamp.bgEnabled = !state.timestamp.bgEnabled;
+      draw();
+    });
+    $('setTimestampBgDefaultBtn').addEventListener('click', () => {
+      state.timestamp.bgEnabled = true;
+      state.timestamp.bgColor = '#ffffff';
+      state.timestamp.bgOpacity = 0.85;
+      state.timestamp.color = '#000000';
+      state.timestamp.opacity = 1;
+      updateUiFromState();
+      draw();
+    });
+
+    $('exportPngBtn').addEventListener('click', () => {
+      draw();
+      canvas.toBlob((blob) => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'frame_' + String(state.currentFrame).padStart(5, '0') + '.png';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }, 'image/png');
+    });
+
+    $('exportVideoBtn').addEventListener('click', async () => {
+      if (!state.loaded) return;
+      setStatus('Export läuft ...');
+      const off = document.createElement('canvas');
+      off.width = canvas.width;
+      off.height = canvas.height;
+      const octx = off.getContext('2d');
+      const stream = off.captureStream(state.fps);
+      let mime = 'video/webm;codecs=vp9';
+      if (!MediaRecorder.isTypeSupported(mime)) mime = 'video/webm;codecs=vp8';
+      if (!MediaRecorder.isTypeSupported(mime)) mime = 'video/webm';
+      const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8000000 });
+      const chunks = [];
+      rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+
+      const oldFrame = state.currentFrame;
+      const oldTime = video.currentTime;
+      const startF = Math.min(state.firstFrame, state.lastFrame ?? totalFrames());
+      const endF = Math.max(state.firstFrame, state.lastFrame ?? totalFrames());
+
+      rec.start(200);
+      for (let f = startF; f <= endF; f++) {
+        await gotoFrame(f);
+        octx.clearRect(0, 0, off.width, off.height);
+        octx.drawImage(video, 0, 0, off.width, off.height);
+        drawGridAndAxes();
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        octx.putImageData(img, 0, 0);
+        await new Promise(r => setTimeout(r, 1000 / state.fps));
+        setStatus('Export läuft ... ' + (f - startF + 1) + '/' + (endF - startF + 1));
+      }
+      rec.stop();
+      await new Promise(resolve => rec.onstop = resolve);
+      const blob = new Blob(chunks, { type: mime });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'video_overlay_frames_' + startF + '_bis_' + endF + '.webm';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      await seekVideo(oldTime);
+      state.currentFrame = oldFrame;
+      draw();
+      setStatus('Export abgeschlossen.');
+    });
+
+    $('setFirstFrameBtn').addEventListener('click', () => {
+      state.firstFrame = state.currentFrame;
+      if (state.lastFrame != null && state.firstFrame > state.lastFrame) {
+        state.lastFrame = state.firstFrame;
+      }
+      draw();
+      setStatus('Erster Frame festgelegt: ' + state.firstFrame);
+    });
+    $('setLastFrameBtn').addEventListener('click', () => {
+      state.lastFrame = state.currentFrame;
+      if (state.lastFrame < state.firstFrame) {
+        state.firstFrame = state.lastFrame;
+      }
+      draw();
+      setStatus('Letzter Frame festgelegt: ' + state.lastFrame);
+    });
+
+    $('trackingClearBtn').addEventListener('click', () => {
+      state.tracking.points = [];
+      updateNavigationUi();
+      draw();
+    });
+    $('trackingUndoBtn').addEventListener('click', () => {
+      state.tracking.points.pop();
+      updateNavigationUi();
+      draw();
+    });
+    $('diagramResetViewBtn').addEventListener('click', () => { draw(); });
+    $('fitRefreshBtn').addEventListener('click', () => { draw(); });
+
+
+    $('trackingClearBtn').addEventListener('click', () => {
+      state.tracking.points = [];
+      updateNavigationUi();
+      draw();
+    });
+    $('trackingUndoBtn').addEventListener('click', () => {
+      if (state.tracking.points.length) state.tracking.points.pop();
+      updateNavigationUi();
+      draw();
+    });
+    $('diagramResetViewBtn').addEventListener('click', () => { draw(); });
+    $('fitRefreshBtn').addEventListener('click', () => { draw(); });
+
+    $('setT0AsFirstFrameBtn').addEventListener('click', () => {
+      let zeroFrame = state.t0Frame;
+      if (state.timeCal.calibrated) {
+        const idealZeroFrame = state.timeCal.anchorFrame - state.timeCal.anchorTime * state.fps;
+        const maxF = totalFrames();
+        if (idealZeroFrame < 0 || idealZeroFrame > maxF) {
+          setStatus('t=0 liegt außerhalb des Videos. Der erste Frame bleibt unverändert.');
+          return;
+        }
+        zeroFrame = Math.round(idealZeroFrame);
+      }
+      state.firstFrame = zeroFrame;
+      if (state.lastFrame != null && state.firstFrame > state.lastFrame) {
+        state.lastFrame = state.firstFrame;
+      }
+      draw();
+      setStatus('Der Frame bei t=0 wurde als erster Frame festgelegt.');
+    });
+
+    setActiveTab('axes');
+    updateUiFromState();
+    draw();
+    window.addEventListener('load', () => { draw(); });
+  </script>
+</body>
+</html>
