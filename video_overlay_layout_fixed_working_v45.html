@@ -473,6 +473,19 @@
                 <div><label>Erste Zahl bei y=</label><input id="diagramLabelStartY" type="number" step="0.1" value="0" /></div>
                 <div><label>Grid-Linienstärke</label><input id="diagramGridWidth" type="number" min="0.25" step="0.25" value="1" /></div>
               </div>
+              <div class="color-row">
+                <div><label>Achsenfarbe</label><input id="diagramAxisColor" type="color" value="#000000" /></div>
+                <div><label>Gridfarbe</label><input id="diagramGridColor" type="color" value="#000000" /></div>
+              </div>
+              <div class="grid3">
+                <div><label>Achsenstärke</label><input id="diagramAxisWidth" type="number" min="0.5" step="0.5" value="2" /></div>
+                <div><label>Achsen-Deckkraft</label><input id="diagramAxisOpacity" type="number" min="0" max="1" step="0.05" value="0.9" /></div>
+                <div><label>Schriftgröße</label><input id="diagramAxisFontSize" type="number" min="8" step="1" value="14" /></div>
+              </div>
+              <div class="grid2">
+                <div><label>Grid-Deckkraft</label><input id="diagramGridOpacity" type="number" min="0" max="1" step="0.05" value="0.5" /></div>
+                <div style="display:flex;align-items:end;"><button id="backToVideoBtn" class="ghost-btn" type="button">Zurück zum Videomodus</button></div>
+              </div>
               <label style="display:flex; align-items:center; gap:8px; margin:6px 0 0 0;">
                 <input id="diagramShowGrid" type="checkbox" style="width:auto;" checked />
                 <span>Grid sichtbar</span>
@@ -672,17 +685,24 @@
       tracking: { step: 1, markerSize: 10, pointerX: 0, pointerY: 0, hasPointer: false, points: [] },
       diagram: {
         type: 'xy',
-        xMin: -2,
-        xMax: 10,
-        yMin: -5,
-        yMax: 2,
+        xMin: NaN,
+        xMax: NaN,
+        yMin: NaN,
+        yMax: NaN,
+        rangeInitialized: false,
         showGrid: true,
         tickStepX: 0,
         tickStepY: 0,
         labelEvery: 1,
         labelStartX: 0,
         labelStartY: 0,
+        axisColor: '#000000',
+        gridColor: '#000000',
+        axisWidth: 2,
+        axisOpacity: 0.9,
+        axisFontSize: 14,
         gridWidth: 1,
+        gridOpacity: 0.5,
         symbolType: 'dot',
         symbolSize: 8,
         symbolColor: '#000000',
@@ -753,6 +773,12 @@
       $('panelExport').style.display = tab === 'export' ? 'block' : 'none';
       if ($('videoFooterControls')) $('videoFooterControls').style.display = tab === 'diagrams' ? 'none' : 'block';
       if ($('diagramFooterControls')) $('diagramFooterControls').style.display = tab === 'diagrams' ? 'block' : 'none';
+      if (tab === 'diagrams') {
+        const series = getDiagramSeries();
+        if (series && series.xs && series.xs.length && (!state.diagram.rangeInitialized || !isFinite(state.diagram.xMin) || !isFinite(state.diagram.xMax) || !isFinite(state.diagram.yMin) || !isFinite(state.diagram.yMax))) {
+          autoSetDiagramRangeFromSeries(series);
+        }
+      }
       if (tab === 'axes') {
         const scaleItem = $('panelAxes').querySelector('.acc-item');
         state.scaleVisible = !!(scaleItem && scaleItem.classList.contains('open'));
@@ -1116,6 +1142,20 @@
       ctx.restore();
     }
 
+    function autoSetDiagramRangeFromSeries(series) {
+      if (!series || !series.xs.length) return;
+      let xmin = Math.min(...series.xs), xmax = Math.max(...series.xs), ymin = Math.min(...series.ys), ymax = Math.max(...series.ys);
+      if (Math.abs(xmax - xmin) < 1e-9) { xmin -= 1; xmax += 1; }
+      if (Math.abs(ymax - ymin) < 1e-9) { ymin -= 1; ymax += 1; }
+      const xpad = 0.08 * (xmax - xmin);
+      const ypad = 0.08 * (ymax - ymin);
+      state.diagram.xMin = xmin - xpad;
+      state.diagram.xMax = xmax + xpad;
+      state.diagram.yMin = ymin - ypad;
+      state.diagram.yMax = ymax + ypad;
+      state.diagram.rangeInitialized = true;
+    }
+
     function drawDiagram() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = '#ffffff';
@@ -1128,6 +1168,10 @@
         updateFitHeaderEquation();
         updateMeta();
         return;
+      }
+      if (!state.diagram.rangeInitialized || !isFinite(state.diagram.xMin) || !isFinite(state.diagram.xMax) || !isFinite(state.diagram.yMin) || !isFinite(state.diagram.yMax)) {
+        autoSetDiagramRangeFromSeries(series);
+        updateUiFromState();
       }
       const margin = {left: 120, right: 60, top: 50, bottom: 100};
       const xs = series.xs, ys = series.ys;
@@ -1159,11 +1203,11 @@
         return (Math.round(idx) % labelEvery) === 0;
       };
 
-      ctx.strokeStyle = 'rgba(15,23,42,0.26)';
+      ctx.strokeStyle = rgba(state.diagram.axisColor, 0.26);
       ctx.lineWidth = 1;
       ctx.strokeRect(margin.left, margin.top, plotW, plotH);
       if (state.diagram.showGrid) {
-        ctx.strokeStyle = 'rgba(59,130,246,0.20)';
+        ctx.strokeStyle = rgba(state.diagram.gridColor, state.diagram.gridOpacity);
         ctx.lineWidth = Math.max(0.5, state.diagram.gridWidth || 1);
         for (let xv = Math.ceil((xmin - 1e-9) / tickX) * tickX; xv <= xmax + 1e-9; xv += tickX) {
           const px = sx(xv);
@@ -1175,19 +1219,19 @@
         }
       }
       if (xmin <= 0 && xmax >= 0) {
-        ctx.strokeStyle = 'rgba(0,0,0,0.40)';
-        ctx.lineWidth = 1.4;
+        ctx.strokeStyle = rgba(state.diagram.axisColor, state.diagram.axisOpacity);
+        ctx.lineWidth = Math.max(1, state.diagram.axisWidth || 2);
         ctx.beginPath(); ctx.moveTo(sx(0), margin.top); ctx.lineTo(sx(0), margin.top+plotH); ctx.stroke();
       }
       if (ymin <= 0 && ymax >= 0) {
-        ctx.strokeStyle = 'rgba(0,0,0,0.40)';
-        ctx.lineWidth = 1.4;
+        ctx.strokeStyle = rgba(state.diagram.axisColor, state.diagram.axisOpacity);
+        ctx.lineWidth = Math.max(1, state.diagram.axisWidth || 2);
         ctx.beginPath(); ctx.moveTo(margin.left, sy(0)); ctx.lineTo(margin.left+plotW, sy(0)); ctx.stroke();
       }
-      ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+      ctx.strokeStyle = rgba(state.diagram.axisColor, Math.min(1, state.diagram.axisOpacity + 0.1));
       ctx.lineWidth = 1;
       ctx.fillStyle = '#111827';
-      ctx.font = screenPxToCanvasPx(16) + 'px "Times New Roman", Georgia, serif';
+      ctx.font = screenPxToCanvasPx(state.diagram.axisFontSize || 14) + 'px "Times New Roman", Georgia, serif';
       for (let xv = Math.ceil((xmin - 1e-9) / tickX) * tickX; xv <= xmax + 1e-9; xv += tickX) {
         const px = sx(xv);
         ctx.beginPath(); ctx.moveTo(px, margin.top+plotH); ctx.lineTo(px, margin.top+plotH+6); ctx.stroke();
@@ -1319,6 +1363,12 @@
       if ($('diagramLabelStartX')) $('diagramLabelStartX').value = state.diagram.labelStartX;
       if ($('diagramLabelStartY')) $('diagramLabelStartY').value = state.diagram.labelStartY;
       if ($('diagramGridWidth')) $('diagramGridWidth').value = state.diagram.gridWidth;
+      if ($('diagramAxisColor')) $('diagramAxisColor').value = state.diagram.axisColor;
+      if ($('diagramGridColor')) $('diagramGridColor').value = state.diagram.gridColor;
+      if ($('diagramAxisWidth')) $('diagramAxisWidth').value = state.diagram.axisWidth;
+      if ($('diagramAxisOpacity')) $('diagramAxisOpacity').value = state.diagram.axisOpacity;
+      if ($('diagramAxisFontSize')) $('diagramAxisFontSize').value = state.diagram.axisFontSize;
+      if ($('diagramGridOpacity')) $('diagramGridOpacity').value = state.diagram.gridOpacity;
       if ($('symbolType')) $('symbolType').value = state.diagram.symbolType;
       if ($('symbolSize')) $('symbolSize').value = state.diagram.symbolSize;
       if ($('symbolColor')) $('symbolColor').value = state.diagram.symbolColor;
@@ -1406,6 +1456,12 @@
       if ($('diagramLabelStartX')) state.diagram.labelStartX = parseFloat($('diagramLabelStartX').value) || 0;
       if ($('diagramLabelStartY')) state.diagram.labelStartY = parseFloat($('diagramLabelStartY').value) || 0;
       if ($('diagramGridWidth')) state.diagram.gridWidth = Math.max(0.25, parseFloat($('diagramGridWidth').value) || 1);
+      if ($('diagramAxisColor')) state.diagram.axisColor = $('diagramAxisColor').value;
+      if ($('diagramGridColor')) state.diagram.gridColor = $('diagramGridColor').value;
+      if ($('diagramAxisWidth')) state.diagram.axisWidth = Math.max(0.5, parseFloat($('diagramAxisWidth').value) || 2);
+      if ($('diagramAxisOpacity')) state.diagram.axisOpacity = clamp(parseFloat($('diagramAxisOpacity').value) || 0.9, 0, 1);
+      if ($('diagramAxisFontSize')) state.diagram.axisFontSize = Math.max(8, parseFloat($('diagramAxisFontSize').value) || 14);
+      if ($('diagramGridOpacity')) state.diagram.gridOpacity = clamp(parseFloat($('diagramGridOpacity').value) || 0.5, 0, 1);
       if ($('symbolType')) state.diagram.symbolType = $('symbolType').value || 'dot';
       if ($('symbolSize')) state.diagram.symbolSize = Math.max(2, parseFloat($('symbolSize').value) || 8);
       if ($('symbolColor')) state.diagram.symbolColor = $('symbolColor').value;
@@ -2447,7 +2503,12 @@
       updateNavigationUi();
       draw();
     });
-    $('diagramResetViewBtn').addEventListener('click', () => { draw(); });
+    $('diagramResetViewBtn').addEventListener('click', () => {
+      const series = getDiagramSeries();
+      autoSetDiagramRangeFromSeries(series);
+      updateUiFromState();
+      draw();
+    });
     $('fitRefreshBtn').addEventListener('click', () => { draw(); });
 
 
@@ -2461,7 +2522,13 @@
       updateNavigationUi();
       draw();
     });
-    $('diagramResetViewBtn').addEventListener('click', () => { draw(); });
+    $('diagramResetViewBtn').addEventListener('click', () => {
+      const series = getDiagramSeries();
+      autoSetDiagramRangeFromSeries(series);
+      updateUiFromState();
+      draw();
+    });
+    if ($('backToVideoBtn')) $('backToVideoBtn').addEventListener('click', () => setActiveTab('axes'));
     $('fitRefreshBtn').addEventListener('click', () => { draw(); });
 
     $('setT0AsFirstFrameBtn').addEventListener('click', () => {
