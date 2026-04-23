@@ -88,6 +88,8 @@
       border-color: var(--accent);
     }
     .accordion { display: grid; gap: 10px; }
+    .diagram-mode-top { display: none; margin-bottom: 12px; }
+    .diagram-sidebar-layout { display: grid; gap: 10px; }
     .acc-item {
       border: 1px solid var(--border);
       border-radius: 16px;
@@ -279,6 +281,10 @@
         <button class="tab-btn" data-tab="tracking" type="button">Objektverfolgung</button>
         <button class="tab-btn" data-tab="diagrams" type="button">Diagramme</button>
         <button class="tab-btn" data-tab="export" type="button">Export</button>
+      </div>
+
+      <div id="diagramModeTop" class="diagram-mode-top">
+        <button id="backToVideoModeBtn" class="primary-btn" type="button">Zurück zum Videomodus</button>
       </div>
 
       <div id="panelAxes" style="display:none">
@@ -533,6 +539,8 @@
         </div>
       </div>
 
+      <div id="diagramSidebarLayout" class="diagram-sidebar-layout" style="display:none;"></div>
+
 
       <div id="panelExport" style="display:none">
         <div class="accordion">
@@ -647,6 +655,8 @@
       handleRadius: 10,
       magnifier: { enabled: false, pointIndex: null, x: 0, y: 0, radius: 70, zoom: 3 },
       activeTab: 'axes',
+      diagramCanvasSize: 900,
+      videoCanvasSize: { width: 1280, height: 720 },
       tracking: { step: 1, markerSize: 10, pointerX: 0, pointerY: 0, hasPointer: false, points: [] },
       diagram: {
         type: 'xy',
@@ -667,6 +677,14 @@
         legendFontSize: 16,
         autoFitLabel: ''
       }
+    };
+    const sidebarNodes = {
+      diagramAccordion: $('panelDiagrams').querySelector('.accordion'),
+      axesAccordion: $('panelAxes').querySelector('.accordion'),
+      diagramTypeItem: $('panelDiagrams').querySelectorAll('.acc-item')[0],
+      symbolItem: $('panelDiagrams').querySelectorAll('.acc-item')[1],
+      fitItem: $('panelDiagrams').querySelectorAll('.acc-item')[2],
+      axisItem: $('panelAxes').querySelectorAll('.acc-item')[1]
     };
 
     function setStatus(msg) { if (statusEl) statusEl.textContent = msg; }
@@ -692,6 +710,19 @@
       return nice * Math.pow(10, exp);
     }
 
+    function niceStepDetailed(raw) {
+      if (!isFinite(raw) || raw <= 0) return 1;
+      const exp = Math.floor(Math.log10(raw));
+      const base = raw / Math.pow(10, exp);
+      let niceBase;
+      if (base <= 1) niceBase = 1;
+      else if (base <= 2) niceBase = 2;
+      else if (base <= 2.5) niceBase = 2.5;
+      else if (base <= 5) niceBase = 5;
+      else niceBase = 10;
+      return niceBase * Math.pow(10, exp);
+    }
+
     function canvasScaleX() {
       const rect = canvas.getBoundingClientRect();
       if (!rect.width) return 1;
@@ -708,16 +739,88 @@
       return px * 0.5 * (canvasScaleX() + canvasScaleY());
     }
 
+    function configureDiagramSidebar(tab) {
+      const isDiagram = tab === 'diagrams';
+      const dropzone = $('dropzone');
+      const tabs = document.querySelector('.toolbar-tabs');
+      const axesPanel = $('panelAxes');
+      const timePanel = $('panelTime');
+      const trackingPanel = $('panelTracking');
+      const exportPanel = $('panelExport');
+      const diagramPanel = $('panelDiagrams');
+      const top = $('diagramModeTop');
+      const layout = $('diagramSidebarLayout');
+      const backBtn = $('backToVideoModeBtn');
+      const fitItem = sidebarNodes.fitItem;
+      const symbolItem = sidebarNodes.symbolItem;
+      const axisItem = sidebarNodes.axisItem;
+      const diagramTypeItem = sidebarNodes.diagramTypeItem;
+      const axisRotationWrap = $('axisAngleInput') ? $('axisAngleInput').closest('.grid2') : null;
+      const axisRotationHint = axisItem ? axisItem.querySelector('.hint') : null;
+
+      if (isDiagram) {
+        dropzone.style.display = 'none';
+        tabs.style.display = 'none';
+        axesPanel.style.display = 'none';
+        timePanel.style.display = 'none';
+        trackingPanel.style.display = 'none';
+        exportPanel.style.display = 'none';
+        diagramPanel.style.display = 'none';
+        top.style.display = 'block';
+        layout.style.display = 'grid';
+        layout.appendChild(fitItem);
+        layout.appendChild(axisItem);
+        layout.appendChild(symbolItem);
+        if (diagramTypeItem) diagramTypeItem.style.display = 'none';
+        if (axisRotationWrap) axisRotationWrap.style.display = 'none';
+        if (axisRotationHint) axisRotationHint.style.display = 'none';
+        if (backBtn && !backBtn.dataset.bound) {
+          backBtn.addEventListener('click', () => setActiveTab('axes'));
+          backBtn.dataset.bound = '1';
+        }
+      } else {
+        top.style.display = 'none';
+        layout.style.display = 'none';
+        dropzone.style.display = 'block';
+        tabs.style.display = 'flex';
+        if (diagramTypeItem) diagramTypeItem.style.display = '';
+        if (axisRotationWrap) axisRotationWrap.style.display = '';
+        if (axisRotationHint) axisRotationHint.style.display = '';
+        sidebarNodes.diagramAccordion.appendChild(diagramTypeItem);
+        sidebarNodes.diagramAccordion.appendChild(symbolItem);
+        sidebarNodes.diagramAccordion.appendChild(fitItem);
+        sidebarNodes.axesAccordion.appendChild(axisItem);
+      }
+    }
+
+    function configureCanvasForTab(tab) {
+      if (tab === 'diagrams') {
+        state.videoCanvasSize = { width: canvas.width, height: canvas.height };
+        const side = Math.max(680, Math.min(1100, Math.min(window.innerWidth - 520, window.innerHeight - 220)));
+        const size = Number.isFinite(side) && side > 0 ? Math.round(side) : 900;
+        state.diagramCanvasSize = size;
+        canvas.width = size;
+        canvas.height = size;
+      } else if (state.videoCanvasSize.width > 0 && state.videoCanvasSize.height > 0) {
+        canvas.width = state.videoCanvasSize.width;
+        canvas.height = state.videoCanvasSize.height;
+      }
+    }
+
     function setActiveTab(tab) {
       state.activeTab = tab;
       document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === tab);
       });
-      $('panelAxes').style.display = tab === 'axes' ? 'block' : 'none';
-      $('panelTime').style.display = tab === 'time' ? 'block' : 'none';
-      $('panelTracking').style.display = tab === 'tracking' ? 'block' : 'none';
-      $('panelDiagrams').style.display = tab === 'diagrams' ? 'block' : 'none';
-      $('panelExport').style.display = tab === 'export' ? 'block' : 'none';
+      configureDiagramSidebar(tab);
+      configureCanvasForTab(tab);
+      if (tab !== 'diagrams') {
+        $('panelAxes').style.display = tab === 'axes' ? 'block' : 'none';
+        $('panelTime').style.display = tab === 'time' ? 'block' : 'none';
+        $('panelTracking').style.display = tab === 'tracking' ? 'block' : 'none';
+        $('panelDiagrams').style.display = tab === 'diagrams' ? 'block' : 'none';
+        $('panelExport').style.display = tab === 'export' ? 'block' : 'none';
+      }
       if ($('videoFooterControls')) $('videoFooterControls').style.display = tab === 'diagrams' ? 'none' : 'block';
       if ($('diagramFooterControls')) $('diagramFooterControls').style.display = tab === 'diagrams' ? 'block' : 'none';
       if (tab === 'axes') {
@@ -1081,7 +1184,7 @@
 
     function drawDiagram() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = '#dbe4ef';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       const series = getDiagramSeries();
       if (!series || !series.xs.length) {
@@ -1092,54 +1195,38 @@
         updateMeta();
         return;
       }
-      const margin = {left: 120, right: 60, top: 50, bottom: 100};
       const xs = series.xs, ys = series.ys;
       let xmin = Math.min(...xs), xmax = Math.max(...xs), ymin = Math.min(...ys), ymax = Math.max(...ys);
       if (Math.abs(xmax-xmin) < 1e-9) { xmin -= 1; xmax += 1; }
       if (Math.abs(ymax-ymin) < 1e-9) { ymin -= 1; ymax += 1; }
-      const xpad = 0.08*(xmax-xmin), ypad = 0.08*(ymax-ymin);
-      xmin -= xpad; xmax += xpad; ymin -= ypad; ymax += ypad;
-      const plotW = canvas.width - margin.left - margin.right;
-      const plotH = canvas.height - margin.top - margin.bottom;
-      const sx = x => margin.left + (x-xmin)/(xmax-xmin)*plotW;
-      const sy = y => margin.top + plotH - (y-ymin)/(ymax-ymin)*plotH;
+      const xpad = Math.max(0.2, 0.08 * (xmax - xmin));
+      const ypad = Math.max(0.2, 0.08 * (ymax - ymin));
+      state.xMin = xmin - xpad;
+      state.xMax = xmax + xpad;
+      state.yMin = ymin - ypad;
+      state.yMax = ymax + ypad;
+      const xSpan = Math.max(1e-9, state.xMax - state.xMin);
+      const ySpan = Math.max(1e-9, state.yMax - state.yMin);
+      state.ticks.x = niceStepDetailed(xSpan / 10);
+      state.ticks.y = niceStepDetailed(ySpan / 10);
+      state.ticks.labelEvery = 1;
+      state.ticks.labelStartX = 0;
+      state.ticks.labelStartY = 0;
+      state.ticks.showZero = true;
+      state.axisAngle = 0;
+      state.axisDisplayMode = 'both';
+      state.origin = {
+        x: clamp((-state.xMin / xSpan) * canvas.width, 48, canvas.width - 48),
+        y: clamp((state.yMax / ySpan) * canvas.height, 48, canvas.height - 48)
+      };
 
-      ctx.strokeStyle = 'rgba(0,0,0,0.25)';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(margin.left, margin.top, plotW, plotH);
-
-      // zero lines
-      if (xmin <= 0 && xmax >= 0) {
-        ctx.beginPath(); ctx.moveTo(sx(0), margin.top); ctx.lineTo(sx(0), margin.top+plotH); ctx.stroke();
-      }
-      if (ymin <= 0 && ymax >= 0) {
-        ctx.beginPath(); ctx.moveTo(margin.left, sy(0)); ctx.lineTo(margin.left+plotW, sy(0)); ctx.stroke();
-      }
-
-      // simple ticks
-      ctx.fillStyle = '#000';
-      ctx.font = screenPxToCanvasPx(16) + 'px Inter, sans-serif';
-      for (let i=0;i<=6;i++) {
-        const xv = xmin + i*(xmax-xmin)/6;
-        const px = sx(xv);
-        ctx.beginPath(); ctx.moveTo(px, margin.top+plotH); ctx.lineTo(px, margin.top+plotH+6); ctx.stroke();
-        const lblx = (Math.round(xv*1000)/1000).toString(); const wl = ctx.measureText(lblx).width; ctx.fillText(lblx, px-wl/2, margin.top+plotH+16);
-      }
-      for (let i=0;i<=6;i++) {
-        const yv = ymin + i*(ymax-ymin)/6;
-        const py = sy(yv);
-        ctx.beginPath(); ctx.moveTo(margin.left-6, py); ctx.lineTo(margin.left, py); ctx.stroke();
-        const lbly = (Math.round(yv*1000)/1000).toString(); ctx.fillText(lbly, 14, py+5);
-      }
-      const xlabw = ctx.measureText(series.xLabel).width; ctx.fillText(series.xLabel, margin.left + plotW/2 - xlabw/2, canvas.height - 28);
-      ctx.save();
-      ctx.translate(40, margin.top + plotH/2 + 60);
-      ctx.rotate(-Math.PI/2);
-      ctx.fillText(series.yLabel, 0, 0);
-      ctx.restore();
+      drawGridAndAxes(true);
 
       // points
-      for (let i=0;i<xs.length;i++) drawSymbol(sx(xs[i]), sy(ys[i]));
+      for (let i=0;i<xs.length;i++) {
+        const p = worldToScreen(xs[i], ys[i]);
+        drawSymbol(p.x, p.y);
+      }
 
       // fit
       let fitLabel = '';
@@ -1155,9 +1242,10 @@
           ctx.beginPath();
           const n=250;
           for (let i=0;i<n;i++) {
-            const x = xmin + i*(xmax-xmin)/(n-1);
+            const x = state.xMin + i*(state.xMax-state.xMin)/(n-1);
             const y = fitFn(x);
-            const px = sx(x), py = sy(y);
+            const p = worldToScreen(x, y);
+            const px = p.x, py = p.y;
             if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
           }
           ctx.stroke();
@@ -1343,6 +1431,7 @@
       if (!video.videoWidth || !video.videoHeight) return;
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
+      state.videoCanvasSize = { width: video.videoWidth, height: video.videoHeight };
       state.origin = { x: canvas.width * 0.14, y: canvas.height * 0.8 };
     }
 
@@ -1621,7 +1710,7 @@
       ctx.restore();
     }
 
-    function drawGridAndAxes() {
+    function drawGridAndAxes(minimalMode = false) {
       const axisColor = rgba(state.axis.color, state.axis.opacity);
       const gridColor = rgba(state.grid.color, state.grid.opacity);
       const fsize = screenPxToCanvasPx(state.axis.fontSize);
@@ -1721,29 +1810,31 @@
 
       if (showX && showY) ctx.fillText('0', state.origin.x + 8, state.origin.y + 8);
 
-      const hs = axisHandles();
-      if (showX) {
-        drawHandle(hs.xMin.x, hs.xMin.y, '#fde68a');
-        drawHandle(hs.xMax.x, hs.xMax.y, '#fde68a');
-      }
-      if (showY) {
-        drawHandle(hs.yMin.x, hs.yMin.y, '#fca5a5');
-        drawHandle(hs.yMax.x, hs.yMax.y, '#fca5a5');
-      }
-      drawHandle(state.origin.x, state.origin.y, '#93c5fd');
+      if (!minimalMode) {
+        const hs = axisHandles();
+        if (showX) {
+          drawHandle(hs.xMin.x, hs.xMin.y, '#fde68a');
+          drawHandle(hs.xMax.x, hs.xMax.y, '#fde68a');
+        }
+        if (showY) {
+          drawHandle(hs.yMin.x, hs.yMin.y, '#fca5a5');
+          drawHandle(hs.yMax.x, hs.yMax.y, '#fca5a5');
+        }
+        drawHandle(state.origin.x, state.origin.y, '#93c5fd');
 
-      // rotation guide and handle
-      const rr = screenPxToCanvasPx(22);
-      ctx.strokeStyle = 'rgba(15,23,42,0.75)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(state.origin.x, state.origin.y, rr, -0.2 * Math.PI, 0.75 * Math.PI);
-      ctx.stroke();
-      drawHandle(hs.rotate.x, hs.rotate.y, '#cbd5e1');
-      const lhs = labelHandles();
-      if (state.showLabelHandles) {
-        if (showX) drawHandle(lhs.xLabel.x, lhs.xLabel.y, '#bfdbfe');
-        if (showY) drawHandle(lhs.yLabel.x, lhs.yLabel.y, '#bfdbfe');
+        // rotation guide and handle
+        const rr = screenPxToCanvasPx(22);
+        ctx.strokeStyle = 'rgba(15,23,42,0.75)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(state.origin.x, state.origin.y, rr, -0.2 * Math.PI, 0.75 * Math.PI);
+        ctx.stroke();
+        drawHandle(hs.rotate.x, hs.rotate.y, '#cbd5e1');
+        const lhs = labelHandles();
+        if (state.showLabelHandles) {
+          if (showX) drawHandle(lhs.xLabel.x, lhs.xLabel.y, '#bfdbfe');
+          if (showY) drawHandle(lhs.yLabel.x, lhs.yLabel.y, '#bfdbfe');
+        }
       }
 
       if (state.scaleVisible && state.scalePoints.length > 0) {
